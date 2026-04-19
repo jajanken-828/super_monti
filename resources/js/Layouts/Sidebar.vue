@@ -543,7 +543,7 @@ const navItems = computed(() => {
             { label: 'Dashboard', href: route('inv.dashboard'), icon: LayoutDashboard, permKey: 'dashboard' },
             { label: 'Materials', href: route('inv.materials'), icon: Spool, permKey: 'materials' },
             { label: 'Products', href: route('inv.products'), icon: Package, permKey: 'products' },
-            { label: 'Bill of Materials', href: route('inv.bom'), icon: Layers, permKey: 'bom' },
+            { label: 'Recipes', href: route('inv.bom'), icon: Layers, permKey: 'bom' },
             { label: 'Stock Checker', href: route('inv.checker'), icon: AlertCircle, permKey: 'checker' },
         ]
         if (isCEO) {

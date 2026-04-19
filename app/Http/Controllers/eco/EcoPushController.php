@@ -6,11 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\OrderQueue;
 use App\Models\PurchaseOrder;
 use App\Models\Client;
-use App\Models\SalesOrder; // Using SalesOrder as established
+use App\Models\SalesOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -21,104 +20,147 @@ class EcoPushController extends Controller
      */
     public function index()
     {
-        // 1. Pending Push: Shows specific Sales Orders (generated from accepted quotations)
-        // We load the purchaseOrder relation to get the formatted PO number and the Client
-        $salesOrders = SalesOrder::where('status', 'pending')
-            ->with(['purchaseOrder.client'])
-            ->latest()
-            ->get();
-        $client_name = Client::where('id', $salesOrders->first()->client_id ?? null)->value('company_name') ?? 'N/A'; 
-        // 2. Already Pushed: Orders that have been dispatched to other modules
-        // Mapping them to match the structure expected by your Vue frontend
-        $pushedOrders = SalesOrder::where('status', '!=', 'pending')
-            ->with(['purchaseOrder.client'])
-            ->latest()
+        // ── 1. Pending pushes ────────────────────────────────────────────────
+        $salesOrders = SalesOrder::where('sales_orders.status', 'pending')
+
+            // Client resolution (direct or via PO)
+            ->leftJoin('clients as direct_client', 'sales_orders.client_id', '=', 'direct_client.id')
+            ->leftJoin('purchase_orders', 'sales_orders.purchase_order_id', '=', 'purchase_orders.po_number')
+            ->leftJoin('clients as po_client', 'purchase_orders.client_id', '=', 'po_client.id')
+
+            // Join bom_records to get recipe details
+            ->leftJoin('bom_records', 'sales_orders.recipe_id', '=', 'bom_records.id')
+
+            ->select(
+                'sales_orders.*',
+                'bom_records.id as recipe_id',
+                'direct_client.company_name   as direct_company_name',
+                'po_client.company_name       as po_company_name',
+                'bom_records.yarn_type        as recipe_yarn_type',
+                'bom_records.dye_color        as recipe_dye_color',
+                'bom_records.weave_design     as recipe_weave_design',
+            )
+            ->latest('sales_orders.created_at')
             ->get()
             ->map(function ($order) {
-                return [
-                    'id' => $order->id,
-                    'po_number' => $order->purchase_order_id, // This holds the formatted PO-2026-001 string
-                    'client' => $order->purchase_order?->client,
-                    'control_number' => $order->control_number,
-                    'pushed_to' => 'SCM', // Usually pushed to SCM status
-                    'pushed_at' => $order->updated_at,
-                ];
+                $data = $order->toArray();
+                $companyName = $order->direct_company_name ?? $order->po_company_name ?? 'N/A';
+                $data['client'] = ['company_name' => $companyName];
+
+                $recipeId = $order->recipe_id ?? null;
+                if ($recipeId) $recipeId = (int) $recipeId;
+
+                $data['extracted_recipes'] = $recipeId ? [$recipeId] : [];
+                $data['recipe'] = $recipeId ? [
+                    'id'           => $recipeId,
+                    'yarn_type'    => $order->recipe_yarn_type    ?? null,
+                    'dye_color'    => $order->recipe_dye_color    ?? null,
+                    'weave_design' => $order->recipe_weave_design ?? null,
+                ] : null;
+
+                return $data;
             });
 
-        // 3. Created P.O.: Manual uploads (if still required by your internal logic)
-        $createdPOs = PurchaseOrder::where('po_number', 'like', 'MPO-%')
-            ->with('client')
-            ->latest()
-            ->get();
+        // ── 2. Already-pushed orders ────────────────────────────────────────
+        $pushedOrders = SalesOrder::where('sales_orders.status', '!=', 'pending')
+            ->leftJoin('clients as direct_client', 'sales_orders.client_id', '=', 'direct_client.id')
+            ->leftJoin('purchase_orders', 'sales_orders.purchase_order_id', '=', 'purchase_orders.po_number')
+            ->leftJoin('clients as po_client', 'purchase_orders.client_id', '=', 'po_client.id')
+            ->leftJoin('bom_records', 'sales_orders.recipe_id', '=', 'bom_records.id')
+            ->select(
+                'sales_orders.*',
+                'bom_records.id as recipe_id',
+                'direct_client.company_name   as direct_company_name',
+                'po_client.company_name       as po_company_name',
+                'bom_records.yarn_type        as recipe_yarn_type',
+                'bom_records.dye_color        as recipe_dye_color',
+                'bom_records.weave_design     as recipe_weave_design',
+            )
+            ->latest('sales_orders.updated_at')
+            ->get()
+            ->map(function ($order) {
+                $data = $order->toArray();
+                $companyName = $order->direct_company_name ?? $order->po_company_name ?? 'N/A';
+                $data['client'] = ['company_name' => $companyName];
 
-        // 4. Data for reference (Modals/Selectors)
-        $clients = Client::select('id', 'company_name')->orderBy('company_name')->get();
-        
-        $allPOs = PurchaseOrder::with('client:id,company_name')
-            ->select('id', 'po_number', 'client_id')
-            ->get();
+                $recipeId = $order->recipe_id ?? null;
+                if ($recipeId) $recipeId = (int) $recipeId;
+
+                $data['extracted_recipes'] = $recipeId ? [$recipeId] : [];
+                $data['recipe'] = $recipeId ? [
+                    'id'           => $recipeId,
+                    'yarn_type'    => $order->recipe_yarn_type    ?? null,
+                    'dye_color'    => $order->recipe_dye_color    ?? null,
+                    'weave_design' => $order->recipe_weave_design ?? null,
+                ] : null;
+
+                return $data;
+            });
 
         return Inertia::render('Dashboard/ECO/Push', [
             'salesOrders'  => $salesOrders,
             'pushedOrders' => $pushedOrders,
-            'createdPOs'   => $createdPOs,
-            'clients'      => $clients,
-            'allPOs'       => $allPOs,
         ]);
     }
 
     /**
-     * Push a Sales Order to Supply Chain Module (SCM).
+     * Push to Supply Chain Management (SCM).
+     *
+     * The route passes {order} which is the sales_order primary-key (id).
+     * We update its status so SCM can see it via ScmSalesOrderController::index().
      */
-    public function pushToSCM($id)
+    public function pushToScm($order)
     {
         try {
-            DB::transaction(function () use ($id) {
-                $order = SalesOrder::findOrFail($id);
+            $salesOrder = SalesOrder::findOrFail($order);
 
-                // Update status
-                $order->update(['status' => 'pushed_to_scm']);
+            // Guard: only push if still pending
+            if ($salesOrder->status !== 'pending') {
+                return redirect()->back()->withErrors([
+                    'error' => 'This order has already been pushed and cannot be pushed again.',
+                ]);
+            }
 
-                // Track in the Order Queue
-                OrderQueue::updateOrCreate(
-                    ['purchase_order_id' => $order->purchase_order_id],
-                    [
-                        'stage' => 'scm', 
-                        'notes' => "Control No: {$order->control_number} Color: {$order->color} pushed to SCM"
-                    ]
-                );
-            });
+            $salesOrder->update([
+                'status'    => 'pushed_to_scm',
+                'pushed_to' => 'SCM',
+            ]);
 
-            return back()->with('success', "Order successfully pushed to SCM.");
+            return redirect()->back()->with('success', 'Order successfully pushed to SCM.');
         } catch (\Exception $e) {
-            Log::error("Push SCM Error: " . $e->getMessage());
-            return back()->withErrors(['error' => 'Failed to push to SCM.']);
+            Log::error('Push SCM Error: ' . $e->getMessage());
+            return redirect()->back()->withErrors(['error' => 'Failed to push to SCM. Please try again.']);
         }
     }
 
     /**
-     * Push to Order Management Module.
+     * Push to Order Management.
      */
-    public function pushToOrderManagement($id)
+    public function pushToOrderMgmt($order)
     {
         try {
-            $order = SalesOrder::findOrFail($id);
-            $order->update(['status' => 'pushed_to_ordermgmt']);
+            $salesOrder = SalesOrder::findOrFail($order);
 
-            OrderQueue::updateOrCreate(
-                ['purchase_order_id' => $order->purchase_order_id],
-                ['stage' => 'order_mgmt', 'notes' => "Control No: {$order->control_number} dispatched to Order Mgmt"]
-            );
+            if ($salesOrder->status !== 'pending') {
+                return redirect()->back()->withErrors([
+                    'error' => 'This order has already been pushed and cannot be pushed again.',
+                ]);
+            }
 
-            return back()->with('success', "Order forwarded to Order Management.");
+            $salesOrder->update([
+                'status'    => 'pushed_to_ordermgmt',
+                'pushed_to' => 'Order Mgmt',
+            ]);
+
+            return redirect()->back()->with('success', 'Order forwarded to Order Management.');
         } catch (\Exception $e) {
-            Log::error("Push Order Mgmt Error: " . $e->getMessage());
-            return back()->withErrors(['error' => 'Failed to push to Order Management.']);
+            Log::error('Push Order Mgmt Error: ' . $e->getMessage());
+            return redirect()->back()->withErrors(['error' => 'Failed to push to Order Management.']);
         }
     }
 
     /**
-     * Manual Store and Manual Job Order methods kept if needed for manual staff overrides
+     * Manual Store (for staff overrides — uploads a PO attachment).
      */
     public function manualStore(Request $request)
     {
@@ -139,6 +181,37 @@ class EcoPushController extends Controller
             'notes'           => 'Manually uploaded via ECO Push Center',
         ]);
 
-        return back()->with('success', 'Manual P.O. successfully created.');
+        return redirect()->back()->with('success', 'Manual PO successfully uploaded and queued.');
+    }
+
+    /**
+     * Manual Job Order store (staff override).
+     * Creates a SalesOrder directly without going through the normal inquiry flow.
+     */
+    public function manualJobOrder(Request $request)
+    {
+        $request->validate([
+            'client_id'    => 'required|exists:clients,id',
+            'color'        => 'nullable|string|max:255',
+            'yarn_type'    => 'nullable|string|max:255',
+            'quantity'     => 'required|numeric|min:1',
+            'total_amount' => 'required|numeric|min:0',
+            'notes'        => 'nullable|string|max:1000',
+        ]);
+
+        $joNumber = 'JO-' . strtoupper(Str::random(8));
+
+        SalesOrder::create([
+            'client_id'    => $request->client_id,
+            'jo_number'    => $joNumber,
+            'color'        => $request->color,
+            'yarn_type'    => $request->yarn_type,
+            'quantity'     => $request->quantity,
+            'total_amount' => $request->total_amount,
+            'status'       => 'pending',
+            'notes'        => $request->notes ?? 'Manually created via ECO Push Center',
+        ]);
+
+        return redirect()->back()->with('success', "Manual Job Order {$joNumber} created successfully.");
     }
 }

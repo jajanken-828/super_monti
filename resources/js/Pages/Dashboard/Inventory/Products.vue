@@ -7,10 +7,9 @@ import {
     Tag, Ruler, Weight, Palette, Clock,
     AlertTriangle, Boxes,
     ChevronDown, Info, Zap, Plus, Trash2,
-    Pencil, Upload, ImageIcon, Check, ImageMinus // Added ImageMinus for delete image modal
+    Pencil, Upload, ImageIcon, Check, ImageMinus
 } from 'lucide-vue-next';
 
-// alias so template can use ChevronRightIcon without conflicting with the card's chevron
 const ChevronRightIcon = ChevronRight;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -37,8 +36,8 @@ const processing = ref(false);
 // ── Confirmation States ───────────────────────────────────────────────────────
 const showEditConfirm = ref(false);
 const productToDelete = ref(null); 
-const colorToDeleteInfo = ref(null); // NEW: Holds { index, isEdit }
-const imageToDelete = ref(null); // NEW: Holds image ID
+const colorToDeleteInfo = ref(null);
+const imageToDelete = ref(null);
 
 // Per-card image slider index keyed by product.id
 const cardSlide = ref({});
@@ -96,7 +95,7 @@ onUnmounted(() => {
 
 watch(() => products.value, () => initAutoSlide(), { deep: true });
 
-// ── Color Management System (Specific to Product) ─────────────────────────────
+// ── Color Management System ─────────────────────────────────────────────────
 const newColorForm = ref({
     name: '',
     hex: '#3b82f6'
@@ -109,20 +108,17 @@ const addColor = () => {
             hex: newColorForm.value.hex 
         };
         
-        // Add directly to the active form's color array
         if (showAddProduct.value) {
             newProduct.value.colors.push(addedColor);
         } else if (showEditProduct.value) {
             editForm.value.colors.push(addedColor);
         }
         
-        // Reset form
         newColorForm.value.name = '';
         newColorForm.value.hex = '#3b82f6';
     }
 };
 
-// ── NEW: Trigger Color Delete Confirmation ──
 const triggerDeleteColor = (index, isEdit = false) => {
     colorToDeleteInfo.value = { index, isEdit };
 };
@@ -137,7 +133,7 @@ const confirmDeleteColor = () => {
         newProduct.value.colors.splice(index, 1);
     }
     
-    colorToDeleteInfo.value = null; // Close confirmation modal
+    colorToDeleteInfo.value = null;
 };
 
 const isDarkColor = (hex) => {
@@ -160,14 +156,24 @@ const addImageInput = ref(null);
 const addImageFiles = ref([]);
 const addImagePreviews = ref([]);
 
+// FIX: Prevent duplicate image files
 const onAddImageChange = (e) => {
     const files = Array.from(e.target.files || []);
-    files.forEach(f => {
-        addImageFiles.value.push(f);
-        const reader = new FileReader();
-        reader.onload = ev => addImagePreviews.value.push(ev.target.result);
-        reader.readAsDataURL(f);
+    files.forEach(newFile => {
+        // Check if this exact file already exists in the list
+        const isDuplicate = addImageFiles.value.some(existingFile =>
+            existingFile.name === newFile.name &&
+            existingFile.size === newFile.size &&
+            existingFile.lastModified === newFile.lastModified
+        );
+        if (!isDuplicate) {
+            addImageFiles.value.push(newFile);
+            const reader = new FileReader();
+            reader.onload = ev => addImagePreviews.value.push(ev.target.result);
+            reader.readAsDataURL(newFile);
+        }
     });
+    // Reset input so same file can be re-selected later if needed
     e.target.value = '';
 };
 
@@ -224,7 +230,6 @@ const removeEditPreview = (i) => {
     editImagePreviews.value.splice(i, 1);
 };
 
-// ── NEW: Trigger Image Delete Confirmation ──
 const triggerDeleteImage = (imageId) => {
     imageToDelete.value = imageId;
 };
@@ -237,7 +242,7 @@ const confirmDeleteImage = () => {
         preserveScroll: true,
         onSuccess: () => {
             editExistingImages.value = editExistingImages.value.filter(img => img.id !== imageToDelete.value);
-            imageToDelete.value = null; // Close confirmation modal
+            imageToDelete.value = null;
         },
         onFinish: () => (processing.value = false),
     });
@@ -542,6 +547,7 @@ const closeModal = () => { selectedProduct.value = null; };
             </div>
         </div>
 
+        <!-- Modal: Product Detail -->
         <Teleport to="body">
             <div v-if="selectedProduct"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
@@ -618,6 +624,7 @@ const closeModal = () => { selectedProduct.value = null; };
             </div>
         </Teleport>
 
+        <!-- Modal: Add Product -->
         <Teleport to="body">
             <div v-if="showAddProduct"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
@@ -729,6 +736,7 @@ const closeModal = () => { selectedProduct.value = null; };
             </div>
         </Teleport>
 
+        <!-- Modal: Edit Product -->
         <Teleport to="body">
             <div v-if="showEditProduct"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
@@ -862,6 +870,7 @@ const closeModal = () => { selectedProduct.value = null; };
             </div>
         </Teleport>
 
+        <!-- Confirmation Modals -->
         <Teleport to="body">
             <div v-if="showEditConfirm" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" @click.self="showEditConfirm = false">
                 <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">

@@ -3,6 +3,7 @@
     <AuthenticatedLayout>
         <div class="max-w-[1600px] mx-auto space-y-10 p-4 lg:p-10">
 
+            <!-- Header with Bulk Inquiry Button -->
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div class="space-y-1">
                     <div class="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-[0.2em]">
@@ -13,11 +14,19 @@
                         Premium <span class="text-indigo-600">Fabrics</span>
                     </h1>
                     <p class="text-sm font-medium text-gray-500 italic">
-                        Browse our textile collection and request a quotation.
+                        Select multiple products and send a bulk inquiry, or inquire individually.
                     </p>
                 </div>
+                <button 
+                    v-if="selectedProducts.length > 0"
+                    @click="openBulkInquiryModal"
+                    class="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg"
+                >
+                    <Send class="h-4 w-4" /> Inquire Selected ({{ selectedProducts.length }})
+                </button>
             </div>
 
+            <!-- Filters -->
             <div class="flex flex-wrap gap-3 items-center justify-between">
                 <div class="flex gap-3 flex-wrap">
                     <div class="relative min-w-[240px] group">
@@ -43,9 +52,20 @@
                 </div>
             </div>
 
+            <!-- Products Grid with Checkboxes (no stock restrictions) -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 <div v-for="product in filteredProducts" :key="product.id"
-                    class="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-800 transition-all duration-300 flex flex-col">
+                    class="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-800 transition-all duration-300 flex flex-col relative">
+
+                    <!-- Selection Checkbox (always enabled) -->
+                    <div class="absolute top-3 left-3 z-10">
+                        <input 
+                            type="checkbox"
+                            :value="product.id"
+                            v-model="selectedProducts"
+                            class="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                    </div>
 
                     <div class="relative overflow-hidden bg-gray-100 dark:bg-gray-800 h-64">
                         <img v-if="product.images && product.images.length > 0" :src="product.images[0].url" :alt="product.name"
@@ -53,24 +73,18 @@
                         <div v-else class="h-full w-full flex items-center justify-center text-gray-300">
                             <Package class="h-16 w-16" />
                         </div>
-                        <div class="absolute top-3 right-3">
-                            <span v-if="product.stock_on_hand <= 0" class="bg-red-500/90 text-white text-[10px] font-black px-2 py-0.5 rounded-full">Out of Stock</span>
-                            <span v-else-if="product.stock_on_hand < 100" class="bg-amber-500/90 text-white text-[10px] font-black px-2 py-0.5 rounded-full">Low Stock</span>
-                        </div>
+                        <!-- Stock badges removed (made‑to‑order) -->
                     </div>
 
                     <div class="p-5 flex flex-col flex-1">
-                        
                         <div class="mb-4">
                             <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Available Colors:</p>
-                            
                             <template v-if="getParsedColors(product.colors).length > 0">
                                 <div v-if="getParsedColors(product.colors).length <= 3" class="flex items-center gap-1.5 flex-wrap">
                                     <div v-for="c in getParsedColors(product.colors)" :key="c.hex" 
                                          class="w-5 h-5 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm"
                                          :style="`background-color: ${c.hex}`" :title="c.name" />
                                 </div>
-                                
                                 <div v-else class="relative w-full max-w-[200px]">
                                     <select class="w-full appearance-none pl-3 pr-8 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-700 dark:text-gray-300 font-medium cursor-pointer">
                                         <option v-for="c in getParsedColors(product.colors)" :key="c.hex" :value="c.hex">
@@ -80,7 +94,6 @@
                                     <ChevronDown class="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
                                 </div>
                             </template>
-                            
                             <template v-else>
                                 <div v-if="product.colorHex" class="flex items-center gap-1.5">
                                     <div class="w-5 h-5 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm"
@@ -100,9 +113,9 @@
                         </div>
 
                         <div class="mt-auto pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-end">
+                            <!-- Inquire button always enabled -->
                             <button @click="openInquiryModal(product)"
-                                :disabled="product.stock_on_hand <= 0"
-                                class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition">
                                 Inquire
                             </button>
                         </div>
@@ -117,9 +130,10 @@
             </div>
         </div>
 
+        <!-- Single Product Inquiry Modal -->
         <Teleport to="body">
-            <div v-if="showModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" @click.self="showModal = false">
-                <div class="bg-white dark:bg-gray-900 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div v-if="showSingleModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" @click.self="showSingleModal = false">
+                <div class="bg-white dark:bg-gray-900 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
                     <div class="p-6 text-center">
                         <div class="w-16 h-16 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 flex items-center justify-center mx-auto mb-4 border-4 border-white dark:border-gray-900 shadow-sm">
                             <Package class="w-8 h-8" />
@@ -130,10 +144,10 @@
                         </p>
                     </div>
                     <div class="p-4 bg-gray-50 dark:bg-gray-800/50 flex gap-3 border-t border-gray-100 dark:border-gray-800">
-                        <button @click="showModal = false" :disabled="submitting" class="flex-1 py-3 text-sm font-bold text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700 rounded-xl transition">
+                        <button @click="showSingleModal = false" :disabled="submitting" class="flex-1 py-3 text-sm font-bold text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700 rounded-xl transition">
                             Cancel
                         </button>
-                        <button @click="submitInquiry" :disabled="submitting" class="flex-1 py-3 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-sm shadow-indigo-500/20 disabled:opacity-50 flex justify-center items-center gap-2">
+                        <button @click="submitSingleInquiry" :disabled="submitting" class="flex-1 py-3 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-sm shadow-indigo-500/20 disabled:opacity-50 flex justify-center items-center gap-2">
                             <span v-if="submitting" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                             <template v-else>
                                 <Check class="w-4 h-4" />
@@ -145,6 +159,54 @@
             </div>
         </Teleport>
 
+        <!-- Bulk Inquiry Modal -->
+        <Teleport to="body">
+            <div v-if="showBulkModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" @click.self="showBulkModal = false">
+                <div class="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+                    <div class="p-6 text-center">
+                        <div class="w-16 h-16 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 flex items-center justify-center mx-auto mb-4 border-4 border-white dark:border-gray-900 shadow-sm">
+                            <Package class="w-8 h-8" />
+                        </div>
+                        <h3 class="text-xl font-black text-gray-900 dark:text-white mb-2">Confirm Bulk Inquiry</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                            You are about to inquire for <strong>{{ selectedProducts.length }}</strong> product(s):
+                        </p>
+                        <ul class="mt-3 text-left text-sm text-gray-700 dark:text-gray-300 list-disc list-inside max-h-40 overflow-y-auto">
+                            <li v-for="pid in selectedProducts" :key="pid">
+                                {{ getProductName(pid) }}
+                            </li>
+                        </ul>
+                        <p class="mt-3 text-sm text-gray-500">Our ECO team will contact you within 24 hours.</p>
+                        <!-- Optional notes field -->
+                        <div class="mt-4 text-left">
+                            <label class="block text-[10px] font-black uppercase text-gray-400 mb-1.5 tracking-widest">
+                                Additional Notes <span class="font-medium normal-case text-gray-400">(optional)</span>
+                            </label>
+                            <textarea
+                                v-model="bulkNotes"
+                                rows="3"
+                                placeholder="e.g. preferred delivery date, volume requirements, special instructions..."
+                                class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
+                            ></textarea>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-gray-50 dark:bg-gray-800/50 flex gap-3 border-t border-gray-100 dark:border-gray-800">
+                        <button @click="showBulkModal = false" :disabled="bulkSubmitting" class="flex-1 py-3 text-sm font-bold text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700 rounded-xl transition">
+                            Cancel
+                        </button>
+                        <button @click="submitBulkInquiry" :disabled="bulkSubmitting" class="flex-1 py-3 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-sm shadow-indigo-500/20 disabled:opacity-50 flex justify-center items-center gap-2">
+                            <span v-if="bulkSubmitting" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                            <template v-else>
+                                <Send class="w-4 h-4" />
+                                <span>Send Inquiry</span>
+                            </template>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- Toast Notification -->
         <Transition name="toast">
             <div v-if="toast.show" class="fixed bottom-8 right-8 z-50 px-6 py-3 rounded-xl shadow-lg text-white font-bold text-sm"
                 :class="toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'">
@@ -158,7 +220,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
-import { Package, Search, ChevronDown, X, Check } from 'lucide-vue-next'; 
+import { Package, Search, ChevronDown, X, Check, Send } from 'lucide-vue-next';
 
 const props = defineProps({
     products: {
@@ -167,7 +229,7 @@ const props = defineProps({
     }
 });
 
-// Helper function to safely parse the colors array
+// Helper: parse colors
 const getParsedColors = (colors) => {
     if (!colors) return [];
     if (Array.isArray(colors)) return colors;
@@ -182,13 +244,18 @@ const getParsedColors = (colors) => {
 const searchQuery = ref('');
 const selectedCategory = ref('All');
 
-// Interactive states
-const submitting = ref(false); 
-const showModal = ref(false);
+// Selection state
+const selectedProducts = ref([]);
+
+// Modal states
+const showSingleModal = ref(false);
+const showBulkModal = ref(false);
 const selectedProduct = ref(null);
+const submitting = ref(false);
+const bulkSubmitting = ref(false);
 const toast = ref({ show: false, type: 'success', message: '' });
 
-// Categories derived from products
+// Categories
 const categories = computed(() => {
     const cats = new Set(props.products.map(p => p.category).filter(Boolean));
     return Array.from(cats);
@@ -207,6 +274,11 @@ const filteredProducts = computed(() => {
     return list;
 });
 
+const getProductName = (id) => {
+    const product = props.products.find(p => p.id === id);
+    return product ? product.name : 'Unknown product';
+};
+
 let debounceTimer;
 const debouncedSearch = () => {
     clearTimeout(debounceTimer);
@@ -214,37 +286,66 @@ const debouncedSearch = () => {
 };
 
 const filterProducts = () => {};
-
 const clearFilters = () => {
     searchQuery.value = '';
     selectedCategory.value = 'All';
 };
 
+// Single inquiry – no stock check
 const openInquiryModal = (product) => {
     selectedProduct.value = product;
-    showModal.value = true;
+    showSingleModal.value = true;
 };
 
-const showToast = (type, message) => {
-    toast.value = { show: true, type, message };
-    setTimeout(() => { toast.value.show = false; }, 3000);
-};
-
-const submitInquiry = async () => {
+const submitSingleInquiry = async () => {
     if (!selectedProduct.value) return;
-    
     submitting.value = true;
     try {
         await router.post(route('client.products.inquire', selectedProduct.value.id), {
             message: `I would like to request more information and a formal quotation for ${selectedProduct.value.name}.`
         });
-        showModal.value = false;
+        showSingleModal.value = false;
         showToast('success', 'Inquiry sent! You can continue the conversation in "My Conversations".');
     } catch (error) {
         showToast('error', 'Failed to send inquiry. Please try again.');
     } finally {
         submitting.value = false;
     }
+};
+
+// Bulk inquiry
+const bulkNotes = ref('');
+
+const openBulkInquiryModal = () => {
+    if (selectedProducts.value.length === 0) return;
+    bulkNotes.value = '';
+    showBulkModal.value = true;
+};
+
+const submitBulkInquiry = async () => {
+    if (selectedProducts.value.length === 0) return;
+    bulkSubmitting.value = true;
+    try {
+        // Only send `message` when the client typed an optional note.
+        // When empty the backend builds the full detailed product message.
+        await router.post(route('client.products.bulk-inquire'), {
+            product_ids: selectedProducts.value,
+            ...(bulkNotes.value.trim() ? { message: bulkNotes.value.trim() } : {}),
+        });
+        showBulkModal.value = false;
+        selectedProducts.value = [];
+        bulkNotes.value = '';
+        showToast('success', 'Bulk inquiry sent! Our team will contact you shortly.');
+    } catch (error) {
+        showToast('error', 'Failed to send bulk inquiry. Please try again.');
+    } finally {
+        bulkSubmitting.value = false;
+    }
+};
+
+const showToast = (type, message) => {
+    toast.value = { show: true, type, message };
+    setTimeout(() => { toast.value.show = false; }, 3000);
 };
 </script>
 

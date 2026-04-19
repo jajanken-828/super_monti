@@ -4,48 +4,43 @@ namespace App\Models;
 
 use App\Models\eco\Inquiry;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class EcoQuotation extends Model
 {
-    use HasFactory;
-
-    // Specifies exactly which table to use
     protected $table = 'eco_quotations';
 
     protected $fillable = [
         'client_id',
         'inquiry_id',
         'quotation_number',
-        'request_new_quote',
-        'reject_reason',
-        // 'delivery_date',
+        'vat_type',
         'payment_terms',
         'notes',
         'grand_total',
         'status',
+        'reject_reason',
+        'request_new_quote',
     ];
 
     protected $casts = [
-        'delivery_date' => 'date',
+        'grand_total'      => 'decimal:2',
         'request_new_quote' => 'boolean',
     ];
 
-    /**
-     * Relationship: One Quotation has many fabric items.
-     */
+    // ── Relationships ────────────────────────────────────────────────────────
+
     public function items()
     {
         return $this->hasMany(EcoQuotationItem::class, 'eco_quotation_id');
     }
 
-    public function client()
-    {
-        return $this->belongsTo(Client::class);
-    }
-
     public function inquiry()
     {
-        return $this->belongsTo(Inquiry::class);
+        return $this->belongsTo(Inquiry::class, 'inquiry_id');
+    }
+
+    public function client()
+    {
+        return $this->belongsTo(\App\Models\Client::class, 'client_id');
     }
 }

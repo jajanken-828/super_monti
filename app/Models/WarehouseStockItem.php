@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\inv\Material;
 use Illuminate\Database\Eloquent\Model;
 
 class WarehouseStockItem extends Model

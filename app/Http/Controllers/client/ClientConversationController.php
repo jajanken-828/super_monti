@@ -3,15 +3,13 @@
 namespace App\Http\Controllers\client;
 
 use App\Http\Controllers\Controller;
-use App\Models\eco\Inquiry;
-use App\Models\eco\ConversationMessage;
 use App\Models\eco\ConversationAttachment;
+use App\Models\eco\ConversationMessage;
+use App\Models\eco\Inquiry;
 use App\Models\EcoQuotation;
-use App\Models\SalesOrder; // Updated to match your ECO namespace
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class ClientConversationController extends Controller
@@ -51,7 +49,7 @@ class ClientConversationController extends Controller
 
         $request->validate([
             'message' => 'required_without:files|nullable|string',
-            'files.*' => 'nullable|file|max:10240', // 10MB limit per file
+            'files.*' => 'nullable|file|max:10240',
         ]);
 
         $message = ConversationMessage::create([
@@ -73,94 +71,115 @@ class ClientConversationController extends Controller
         }
 
         $inquiry->update(['last_message_at' => now()]);
+
         return back()->with('success', 'Message sent.');
     }
 
-    public function acceptQuotation(Request $request, EcoQuotation $quotation)
+    /**
+     * Send one or more Purchase Order files to the conversation.
+     */
+    public function sendPO(Request $request, Inquiry $inquiry)
     {
-        // Authorization (Commented out as per your snippet)
-        // if ($quotation->client_id !== Auth::guard('client')->id() || $quotation->status !== 'sent') {
-        //     abort(403);
-        // }
+        $this->authorizeClient($inquiry);
 
-        // 1. Generate PO Control Number (Format: PO-YYYYMMDD-0001)
-        $dateString = now()->format('Ymd'); // e.g., 20260416
-        $dateForQuery = now()->format('Y-m-d');
+        $request->validate([
+            'po_files' => 'required|array|min:1',
+            'po_files.*' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'notes' => 'nullable|string|max:500',
+        ]);
 
-        // Find the last sales order created today to get the next sequence number
-        $lastOrder = SalesOrder::whereDate('created_at', $dateForQuery)
-            ->orderBy('id', 'desc')
-            ->first();
+        $message = ConversationMessage::create([
+            'inquiry_id' => $inquiry->id,
+            'sender_type' => 'client',
+            'message' => "📄 **Purchase Order uploaded**\n".($request->notes ? 'Notes: '.$request->notes : ''),
+            'is_system_event' => true,
+        ]);
 
-        // Regex updated to look for PO-8digits-digits
-        if ($lastOrder && preg_match('/PO-\d{8}-(\d+)/', $lastOrder->purchase_order_id, $matches)) {
-            $number = intval($matches[1]) + 1;
-        } else {
-            $number = 1;
-        }
-
-        $poControlNumber = 'PO-' . $dateString . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
-
-        // 2. Update Statuses
-        $quotation->update(['status' => 'accepted']);
-        $quotation->inquiry->update(['status' => 'converted']);
-
-        // 3. Generate unique Job Order Number for this batch
-        $joNumber = 'JO-' . now()->format('Ymd') . '-' . strtoupper(Str::random(4));
-
-        // 4. Create Sales Orders for EACH color/item in the quotation
-        foreach ($quotation->items as $index => $item) {
-            // Generate a Control Number (e.g., CTL-26RED-UNIQUEID)
-            $colorCode = strtoupper(substr($item->color ?? 'COL', 0, 3));
-            $controlNumber = 'CTL-' . now()->format('y') . $colorCode . '-' . strtoupper(Str::random(5));
-
-            SalesOrder::create([
-                'purchase_order_id' => $poControlNumber, // Format: PO-20260416-0001
-                'jo_number'         => $joNumber,
-                'control_number'    => $controlNumber,
-                'color'             => $item->color,
-                'quantity'          => $item->kilos,
-                'yarn_type'         => $item->fabric,
-                'design'            => $item->design ?? 'Standard',
-                'status'            => 'pending',
-                'client_id'         => $quotation->client_id,
+        foreach ($request->file('po_files') as $file) {
+            $path = $file->store('client_po', 'public');
+            ConversationAttachment::create([
+                'conversation_message_id' => $message->id,
+                'file_path' => $path,
+                'file_name' => $file->getClientOriginalName(),
+                'file_type' => $file->getMimeType(),
+                'is_po' => true, // Mark as Purchase Order
             ]);
         }
 
-        // 5. Create a system message in the chat history
-        $messageText = "Quotation {$quotation->quotation_number} has been ACCEPTED by the client.\nPO Number: {$poControlNumber}\nJO Number: {$joNumber}";
+        $inquiry->update(['last_message_at' => now()]);
+
+        return back()->with('success', 'Purchase Order(s) sent.');
+    }
+
+    /**
+     * Approve an attachment sent by ECO (or any attachment in the conversation).
+     * This is called by the client when they approve a file.
+     */
+    public function approveAttachment(ConversationAttachment $attachment)
+    {
+        $inquiry = $attachment->message->inquiry;
+        $this->authorizeClient($inquiry);
+
+        $attachment->update(['approved_by_client' => true]);
+
+        // Create a system message to notify ECO
+        ConversationMessage::create([
+            'inquiry_id' => $inquiry->id,
+            'sender_type' => 'client',
+            'message' => "✅ Client approved attachment: {$attachment->file_name}",
+            'is_system_event' => true,
+        ]);
+
+        return back()->with('success', 'Attachment approved.');
+    }
+
+    /**
+     * Accept a quotation (price agreement only, no order created yet).
+     */
+    public function acceptQuotation(Request $request, EcoQuotation $quotation)
+    {
+        // Only allow if the quotation belongs to this client and is still 'sent'
+        if ($quotation->client_id !== Auth::guard('client')->id() || $quotation->status !== 'sent') {
+            abort(403);
+        }
+
+        // Update quotation status
+        $quotation->update(['status' => 'accepted']);
+
+        // System message
+        $messageText = "Quotation {$quotation->quotation_number} has been ACCEPTED by the client.";
         if ($request->notes) {
             $messageText .= "\n\nNotes from client: " . $request->notes;
         }
 
         $message = ConversationMessage::create([
-            'inquiry_id'      => $quotation->inquiry_id,
-            'sender_type'     => 'client',
-            'message'         => $messageText,
+            'inquiry_id' => $quotation->inquiry_id,
+            'sender_type' => 'client',
+            'message' => $messageText,
             'is_system_event' => true,
         ]);
 
-        // 6. Handle the files uploaded in the Modal
+        // Handle any attached files (e.g., proof of payment)
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $file) {
                 $path = $file->store('eco_attachments', 'public');
                 ConversationAttachment::create([
                     'conversation_message_id' => $message->id,
-                    'file_path'               => $path,
-                    'file_name'               => $file->getClientOriginalName(),
-                    'file_type'               => $file->getMimeType(),
+                    'file_path' => $path,
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_type' => $file->getMimeType(),
                 ]);
             }
         }
 
-        return back()->with('success', 'Quotation accepted. PO ' . $poControlNumber . ' and Job Orders generated.');
+        return back()->with('success', 'Quotation accepted successfully.');
     }
 
     public function rejectQuotation(Request $request, EcoQuotation $quotation)
     {
-        // if ($quotation->client_id !== Auth::guard('client')->id() || $quotation->status !== 'sent') {
-        //     abort(403);
-        // }
+        if ($quotation->client_id !== Auth::guard('client')->id() || $quotation->status !== 'sent') {
+            abort(403);
+        }
 
         $request->validate([
             'reason' => 'required|string|max:1000',
@@ -170,11 +189,10 @@ class ClientConversationController extends Controller
         $quotation->update([
             'status' => 'rejected',
             'reject_reason' => $request->reason,
-            'request_new_quote' => $request->request_new
+            'request_new_quote' => $request->request_new ?? false,
         ]);
 
         $msg = "Quotation {$quotation->quotation_number} REJECTED. Reason: {$request->reason}";
-
         if ($request->request_new) {
             $msg .= " | Client requested a revised quotation.";
         }
@@ -189,6 +207,27 @@ class ClientConversationController extends Controller
         return back()->with('success', 'Quotation rejected.');
     }
 
+    /**
+     * Download an accepted quotation as a PDF.
+     */
+    public function downloadQuotation(EcoQuotation $quotation)
+    {
+        if ($quotation->client_id !== Auth::guard('client')->id()) {
+            abort(403);
+        }
+
+        if ($quotation->status !== 'accepted') {
+            abort(403, 'Only accepted quotations can be downloaded.');
+        }
+
+        $quotation->load(['items', 'inquiry.product']);
+
+        return response()->json([
+            'quotation' => $quotation,
+            'generated_at' => now()->toDateTimeString(),
+        ]);
+    }
+
     public function destroyAttachment(ConversationAttachment $attachment)
     {
         if ($attachment->message->inquiry->client_id !== Auth::guard('client')->id()) {
@@ -196,6 +235,7 @@ class ClientConversationController extends Controller
         }
         Storage::disk('public')->delete($attachment->file_path);
         $attachment->delete();
+
         return back()->with('success', 'File removed.');
     }
 

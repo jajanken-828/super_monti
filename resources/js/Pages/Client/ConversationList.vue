@@ -74,12 +74,23 @@
                             <tr v-for="inquiry in filteredInquiries" :key="inquiry.id" class="group hover:bg-gray-50/50 transition-all">
                                 <td class="px-8 py-6">
                                     <div class="flex items-center gap-4">
-                                        <div class="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                                            <Package class="h-5 w-5" />
+                                        <div class="h-10 w-10 rounded-xl flex items-center justify-center"
+                                            :class="isBulkInquiry(inquiry) ? 'bg-indigo-100 text-indigo-600' : 'bg-indigo-50 text-indigo-600'">
+                                            <Layers v-if="isBulkInquiry(inquiry)" class="h-5 w-5" />
+                                            <Package v-else class="h-5 w-5" />
                                         </div>
-                                        <div>
+                                        <div v-if="!isBulkInquiry(inquiry)">
                                             <p class="text-sm font-black text-gray-900 dark:text-white">{{ inquiry.product?.name }}</p>
                                             <p class="text-[10px] font-bold text-gray-400">{{ inquiry.product?.sku }}</p>
+                                        </div>
+                                        <div v-else>
+                                            <div class="flex items-center gap-1.5 mb-0.5">
+                                                <p class="text-sm font-black text-indigo-600">Multiple Products</p>
+                                                <span class="text-[9px] bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400 rounded-full px-2 py-0.5 font-black">
+                                                    {{ getBulkProductCount(inquiry.initial_message) }}
+                                                </span>
+                                            </div>
+                                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Bulk Inquiry</p>
                                         </div>
                                     </div>
                                 </td>
@@ -119,7 +130,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
-import { MessageSquare, Plus, Search, Package, ArrowRight } from 'lucide-vue-next';
+import { MessageSquare, Plus, Search, Package, ArrowRight, Layers } from 'lucide-vue-next';
 
 const props = defineProps({
     inquiries: {
@@ -170,6 +181,19 @@ const formatStatus = (status) => {
 const formatDate = (date) => {
     if (!date) return '—';
     return new Date(date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+// Bulk inquiry helpers
+const isBulkInquiry = (inquiry) => inquiry.product?.name === 'Bulk Inquiry' || !inquiry.product;
+
+/**
+ * Extracts the product count from the structured bulk message header.
+ * Format: "📦 BULK PRODUCT INQUIRY — N Product(s)"
+ */
+const getBulkProductCount = (message) => {
+    if (!message) return '';
+    const match = message.match(/BULK PRODUCT INQUIRY\s*[—-]\s*(\d+)\s*Product/i);
+    return match ? `${match[1]} items` : 'Bulk';
 };
 </script>
 

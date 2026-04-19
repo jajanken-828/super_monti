@@ -20,9 +20,24 @@ class CheckPagePermission
     {
         $user = Auth::user();
 
+        if (!$user) {
+            abort(403, 'Unauthorized.');
+        }
+
         // CEO bypasses all checks
-        if ($user && $user->role === 'CEO') {
+        if ($user->role === 'CEO') {
             return $next($request);
+        }
+
+        // Secretaries and General Managers have full access to their root module
+        if (in_array($user->position, ['secretary', 'general_manager'])) {
+            $module = $this->detectModule($request);
+            $rootModule = $this->getRootModuleForUser($user);
+
+            if ($module && $rootModule && strtoupper($module) === $rootModule) {
+                // Allow full access to all pages within their root module
+                return $next($request);
+            }
         }
 
         // Fallback: HRM staff can always view the dashboard (legacy support)
@@ -110,5 +125,30 @@ class CheckPagePermission
             'WAR', 'INV', 'PRO', 'WRF', 'FIN', 'PROJ', 'IT', 'CEO'
         ];
         return in_array($module, $validModules);
+    }
+
+    /**
+     * Get the root module for a secretary or general manager.
+     * Mirrors the logic in CeoAccessController.
+     *
+     * @param \App\Models\User $user
+     * @return string|null
+     */
+    protected function getRootModuleForUser($user): ?string
+    {
+        $coreModules = ['HRM', 'CRM', 'MAN', 'LOG'];
+
+        if ($user->is_manufacturing_supervisor) {
+            return 'MAN';
+        }
+
+        $roleUpper = strtoupper($user->role);
+        foreach ($coreModules as $core) {
+            if (str_contains($roleUpper, $core)) {
+                return $core;
+            }
+        }
+
+        return null;
     }
 }

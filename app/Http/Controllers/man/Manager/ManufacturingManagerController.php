@@ -8,6 +8,7 @@ use App\Models\Machine;
 use App\Models\ManufacturingOrder;
 use App\Models\Package;
 use App\Models\PurchaseOrder;
+use App\Models\SalesOrder;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -75,7 +76,8 @@ class ManufacturingManagerController extends Controller
 
     public function production()
     {
-        $orders = PurchaseOrder::with(['client', 'items.product'])
+        // 1. Fetch Purchase Orders (from SCM) with stage 'man_production'
+        $purchaseOrders = PurchaseOrder::with(['client', 'items.product'])
             ->whereHas('queue', function ($q) {
                 $q->where('stage', 'man_production');
             })
@@ -83,18 +85,47 @@ class ManufacturingManagerController extends Controller
             ->map(function ($order) {
                 $items = $order->items->map(fn($item) => [
                     'product_name' => $item->product->name,
-                    'product_sku' => $item->product->sku,
-                    'quantity' => $item->quantity,
+                    'product_sku'  => $item->product->sku,
+                    'quantity'     => $item->quantity,
                 ]);
                 return [
-                    'id' => $order->id,
-                    'po_number' => $order->po_number,
-                    'client_name' => $order->client->company_name,
-                    'total_quantity' => $order->items->sum('quantity'),
-                    'items' => $items,
-                    'created_at' => $order->created_at,
+                    'type'          => 'purchase_order',
+                    'id'            => $order->id,
+                    'order_number'  => $order->po_number,
+                    'client_name'   => $order->client->company_name,
+                    'total_quantity'=> $order->items->sum('quantity'),
+                    'items'         => $items,
+                    'created_at'    => $order->created_at,
                 ];
             });
+
+        // 2. Fetch Sales Orders (Job Orders) with status 'in_production' (pushed from SCM)
+        $salesOrders = SalesOrder::with(['client', 'recipe'])
+            ->where('status', 'in_production')
+            ->get()
+            ->map(function ($order) {
+                // Build item representation
+                $items = [];
+                if ($order->color || $order->yarn_type) {
+                    $productName = trim(($order->color ?? '') . ' ' . ($order->yarn_type ?? ''));
+                    $items[] = [
+                        'product_name' => $productName ?: 'Custom Product',
+                        'quantity'     => $order->quantity ?? 0,
+                    ];
+                }
+                return [
+                    'type'          => 'sales_order',
+                    'id'            => $order->id,
+                    'order_number'  => $order->jo_number ?? 'JO-' . $order->id,
+                    'client_name'   => $order->client->company_name ?? 'N/A',
+                    'total_quantity'=> $order->quantity ?? 0,
+                    'items'         => $items,
+                    'created_at'    => $order->created_at,
+                ];
+            });
+
+        // Merge both collections and sort by created_at descending
+        $orders = $purchaseOrders->concat($salesOrders)->sortByDesc('created_at')->values();
 
         return Inertia::render('Dashboard/MAN/Manager/Production', [
             'orders' => $orders,
@@ -133,20 +164,48 @@ class ManufacturingManagerController extends Controller
         ]);
     }
 
-    public function forwardToChecker($orderId)
+    /**
+     * Forward an order (Purchase Order or Sales Order) to Checker Quality.
+     * Creates a ManufacturingOrder record and updates the order's stage/status.
+     */
+    public function forwardToChecker(Request $request, $orderId)
     {
-        $order = PurchaseOrder::findOrFail($orderId);
-        $totalQuantity = $order->items->sum('quantity');
+        $type = $request->input('type', 'purchase_order'); // 'purchase_order' or 'sales_order'
+        $user = Auth::user();
 
-        ManufacturingOrder::create([
-            'purchase_order_id' => $order->id,
-            'total_quantity' => $totalQuantity,
-            'remaining_quantity' => $totalQuantity,
-            'status' => 'pending',
-            'notes' => 'Forwarded to manufacturing by ' . Auth::user()->name,
-        ]);
+        if ($type === 'purchase_order') {
+            $order = PurchaseOrder::findOrFail($orderId);
+            $totalQuantity = $order->items->sum('quantity');
 
-        $order->queue()->update(['stage' => 'man_production']);
+            ManufacturingOrder::create([
+                'purchase_order_id' => $order->id,
+                'total_quantity'    => $totalQuantity,
+                'remaining_quantity'=> $totalQuantity,
+                'status'            => 'pending',
+                'notes'             => 'Forwarded to manufacturing by ' . $user->name,
+            ]);
+
+            $order->queue()->update(['stage' => 'man_production']);
+
+        } elseif ($type === 'sales_order') {
+            $order = SalesOrder::findOrFail($orderId);
+            $totalQuantity = $order->quantity ?? 0;
+
+            // Create a ManufacturingOrder (you may need to link it to sales_order_id if you add that column)
+            ManufacturingOrder::create([
+                'sales_order_id'      => $order->id, // Ensure this column exists or adjust
+                'total_quantity'      => $totalQuantity,
+                'remaining_quantity'  => $totalQuantity,
+                'status'              => 'pending',
+                'notes'               => 'Forwarded to manufacturing by ' . $user->name,
+            ]);
+
+            // Update status to indicate it's in production (already 'in_production' from SCM push)
+            $order->update(['status' => 'in_production']);
+        } else {
+            abort(400, 'Invalid order type.');
+        }
+
         return redirect()->back()->with('message', 'Order forwarded to production successfully.');
     }
 

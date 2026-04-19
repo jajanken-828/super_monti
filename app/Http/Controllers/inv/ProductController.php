@@ -1,35 +1,25 @@
 <?php
 
-namespace App\Http\Controllers\inv; // Keep an eye on this if you renamed the folder to INV!
+namespace App\Http\Controllers\inv;
 
 use App\Http\Controllers\Controller;
-use App\Models\inv\Material;
 use App\Models\inv\Product;
-use App\Models\inv\ProductBom;
 use App\Models\inv\ProductImage;
-use App\Models\inv\ProductSize;
-use App\Models\inv\ProductSpec;
-use App\Models\inv\Warehouse;
-use App\Models\inv\WarehouseMaterial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class ProductController extends Controller
 {
     public function product()
     {
         $products = Product::with(['images'])
-            ->orderBy('id', 'desc') // Changed to desc so your newly created products show up first!
+            ->orderBy('id', 'desc')
             ->get()
             ->map(function (Product $p) {
-                
-                // 💥 BULLETPROOF COLOR PARSING 💥
-                // This guarantees Vue receives a clean Array, no matter what happens in the DB.
                 $colorsArray = [];
                 if (!empty($p->colors)) {
-                    // If it's a string, decode it. If it's already an array, just use it.
                     $colorsArray = is_string($p->colors) ? json_decode($p->colors, true) : $p->colors;
                 }
 
@@ -40,14 +30,9 @@ class ProductController extends Controller
                     'name' => $p->name,
                     'category' => $p->category,
                     'status' => $p->status,
-                    
-                    // The safely parsed array
-                    'colors' => $colorsArray, 
-                    
-                    // Legacy support so your old products don't break Vue 
+                    'colors' => $colorsArray,
                     'colorName' => $p->color_name ?? null,
                     'colorHex' => $p->color_hex ?? null,
-                    
                     'images' => $p->images->map(fn($img) => [
                         'id' => $img->id,
                         'url' => $img->url,
@@ -62,91 +47,151 @@ class ProductController extends Controller
         ]);
     }
 
+    /**
+     * Generate a unique product_id and SKU with retry logic
+     */
+    private function generateUniqueIdentifiers($name)
+    {
+        $maxAttempts = 10;
+        $attempt = 0;
+
+        do {
+            $productId = 'PRD-' . strtoupper(Str::random(6));
+            $skuBase = strtoupper(substr(Str::slug($name), 0, 3));
+            $sku = $skuBase . '-' . strtoupper(Str::random(4));
+
+            $exists = Product::where('product_id', $productId)
+                ->orWhere('sku', $sku)
+                ->exists();
+
+            if (!$exists) {
+                return ['product_id' => $productId, 'sku' => $sku];
+            }
+
+            $attempt++;
+            if ($attempt >= $maxAttempts) {
+                throw new \Exception('Unable to generate unique product_id/sku after ' . $maxAttempts . ' attempts.');
+            }
+        } while (true);
+    }
+
     public function store(Request $request)
     {
-        // dd($request->all()); // Debugging line to inspect incoming data structure, especially for colors and images.
-        // 1. Validation: Changed to 'nullable' because FormData strips empty arrays!
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'colors' => 'nullable|array', 
-            'category' => 'nullable|string',
-            'images.*' => 'image|mimes:jpeg,png,jpg|max:2048',
-        ]);
+        try {
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'colors' => 'nullable|array',
+                'category' => 'nullable|string',
+                'images.*' => 'image|mimes:jpeg,png,jpg|max:2048',
+            ]);
 
-        // 2. Create Product
-        $product = Product::create([
-            'name' => $request->name,
-            'colors' => $request->colors ?? [], // Default to empty array if null
-            'category' => $request->category ?? 'Uncategorized',
-            'status' => 'Active',
-        ]);
+            // Generate unique product_id and SKU
+            $identifiers = $this->generateUniqueIdentifiers($request->name);
 
-        // 3. Handle images
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $image) {
-                $path = $image->store('products', 'public');
-                $product->images()->create([
-                    'url' => '/storage/' . $path  
-                ]);
+            // Create Product
+            $product = Product::create([
+                'name' => $request->name,
+                'colors' => $request->colors ?? [],
+                'category' => $request->category ?? 'Uncategorized',
+                'status' => 'Active',
+                'product_id' => $identifiers['product_id'],
+                'sku' => $identifiers['sku'],
+            ]);
+
+            // Handle images with duplicate prevention
+            if ($request->hasFile('images')) {
+                $storedPaths = [];
+                foreach ($request->file('images') as $image) {
+                    $path = $image->store('products', 'public');
+                    if (!in_array($path, $storedPaths)) {
+                        $storedPaths[] = $path;
+                        $product->images()->create(['url' => '/storage/' . $path]);
+                    }
+                }
             }
-        }
 
-        return back()->with('success', 'Product created with color availability!');
+            return back()->with('success', 'Product created successfully!');
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (str_contains($e->getMessage(), 'Duplicate entry')) {
+                return back()->withErrors(['error' => 'Duplicate product ID or SKU generated. Please try again.']);
+            }
+            \Log::error('Product store DB error: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Database error: ' . $e->getMessage()]);
+        } catch (\Exception $e) {
+            \Log::error('Product store general error: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to save product: ' . $e->getMessage()]);
+        }
     }
 
     public function update(Request $request, $id)
     {
-        $product = Product::findOrFail($id);
+        try {
+            $product = Product::findOrFail($id);
 
-        // 1. Update Validation: Changed to 'nullable' to prevent silent failures
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'colors' => 'nullable|array', 
-            'new_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
-        ]);
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'colors' => 'nullable|array',
+                'new_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:51200',
+            ]);
 
-        // 2. Update Database
-        $product->update([
-            'name' => $request->name,
-            'colors' => $request->colors ?? [], 
-        ]);
+            // Update product (keep existing product_id/sku)
+            $product->update([
+                'name' => $request->name,
+                'colors' => $request->colors ?? [],
+            ]);
 
-        // 3. Handle newly added images
-        if ($request->hasFile('new_images')) {
-            foreach ($request->file('new_images') as $image) {
-                $path = $image->store('products', 'public');
-                $product->images()->create([
-                    'url' => '/storage/' . $path 
-                ]);
+            // Handle newly added images
+            if ($request->hasFile('new_images')) {
+                $storedPaths = [];
+                foreach ($request->file('new_images') as $image) {
+                    $path = $image->store('products', 'public');
+                    if (!in_array($path, $storedPaths)) {
+                        $storedPaths[] = $path;
+                        $product->images()->create(['url' => '/storage/' . $path]);
+                    }
+                }
             }
-        }
 
-        return back()->with('success', 'Product updated successfully.');
+            return back()->with('success', 'Product updated successfully.');
+
+        } catch (\Exception $e) {
+            \Log::error('Product update error: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to update product: ' . $e->getMessage()]);
+        }
     }
 
     public function destroy($id)
     {
-        $product = Product::findOrFail($id);
+        try {
+            $product = Product::findOrFail($id);
 
-        foreach ($product->images as $image) {
-            $storagePath = str_replace('/storage/', '', $image->url);
-            Storage::disk('public')->delete($storagePath);
+            foreach ($product->images as $image) {
+                $storagePath = str_replace('/storage/', '', $image->url);
+                Storage::disk('public')->delete($storagePath);
+            }
+
+            $product->delete();
+
+            return back()->with('success', 'Product deleted.');
+        } catch (\Exception $e) {
+            \Log::error('Product delete error: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to delete product: ' . $e->getMessage()]);
         }
-
-        $product->delete();
-
-        return back()->with('success', 'Product deleted.');
     }
 
     public function destroyImage($imageId)
     {
-        $image = ProductImage::findOrFail($imageId);
+        try {
+            $image = ProductImage::findOrFail($imageId);
+            $storagePath = str_replace('/storage/', '', $image->url);
+            Storage::disk('public')->delete($storagePath);
+            $image->delete();
 
-        $storagePath = str_replace('/storage/', '', $image->url);
-        Storage::disk('public')->delete($storagePath);
-
-        $image->delete();
-
-        return back()->with('success', 'Image removed.');
+            return back()->with('success', 'Image removed.');
+        } catch (\Exception $e) {
+            \Log::error('Image delete error: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to delete image: ' . $e->getMessage()]);
+        }
     }
 }

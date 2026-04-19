@@ -13,7 +13,7 @@ import {
     UserCog, MessageSquare, Navigation, MapPin, Briefcase, Plus, ArrowLeft,
     Paperclip, Loader2, Info, Phone, Mail, Calendar, Tag, Weight, Ruler, Layers,
     ArrowRight, Zap, Activity, DollarSign, Users as UsersIcon, UserCog2, Camera,
-    Sparkles, Palette, Wrench, CheckCircle2
+    Sparkles, Palette, Wrench, CheckCircle2, UserPen
 } from 'lucide-vue-next'
 
 const page = usePage()
@@ -585,158 +585,155 @@ const logoutRoute = computed(() => {
             </button>
         </nav>
 
-        <!-- Backdrop (only shown when sidebar is open) -->
-        <transition enter-active-class="transition-opacity duration-300 ease-in-out" enter-from-class="opacity-0"
-            enter-to-class="opacity-100" leave-active-class="transition-opacity duration-200 ease-in-out"
-            leave-from-class="opacity-100" leave-to-class="opacity-0">
-            <div v-if="isOpen" @click="isOpen = false" class="fixed inset-0 z-[50] bg-black/40 backdrop-blur-sm"
-                aria-hidden="true"></div>
-        </transition>
+        <!-- Backdrop (shown when sidebar is open) -->
+        <div v-show="isOpen"
+            class="fixed inset-0 z-[50] bg-black/40 backdrop-blur-sm transition-opacity duration-300"
+            @click="isOpen = false"
+            aria-hidden="true"></div>
 
         <!-- Sliding Sidebar -->
-        <transition enter-active-class="transition-transform duration-300 ease-out" enter-from-class="-translate-x-full"
-            enter-to-class="translate-x-0" leave-active-class="transition-transform duration-200 ease-in"
-            leave-from-class="translate-x-0" leave-to-class="-translate-x-full">
-            <div v-if="isOpen"
-                class="fixed inset-y-0 left-0 z-[55] w-[80vw] max-w-sm bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl flex flex-col shadow-2xl h-full pt-16 border-r border-gray-200/50 dark:border-gray-800/50">
-                <div class="flex-1 flex flex-col overflow-y-auto px-3 py-6 custom-scrollbar">
-                    <div class="mb-4 px-2">
-                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">Main Menu</p>
-                    </div>
-                    <nav class="space-y-1">
-                        <template v-for="item in navItems" :key="item.label || item.isHeading">
-                            <!-- Heading -->
-                            <div v-if="item.isHeading" class="mb-3 px-2 pt-4 first:pt-0">
-                                <p class="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em]">{{ item.label }}</p>
-                            </div>
+        <div v-show="isOpen"
+            :class="[
+                'fixed inset-y-0 left-0 z-[55] w-[80vw] max-w-sm bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl flex flex-col shadow-2xl h-full pt-16 border-r border-gray-200/50 dark:border-gray-800/50 transition-transform duration-300 ease-out',
+                isOpen ? 'translate-x-0' : '-translate-x-full'
+            ]">
+            <div class="flex-1 flex flex-col overflow-y-auto px-3 py-6 custom-scrollbar">
+                <div class="mb-4 px-2">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">Main Menu</p>
+                </div>
+                <nav class="space-y-1">
+                    <template v-for="item in navItems" :key="item.label || item.isHeading">
+                        <!-- Heading -->
+                        <div v-if="item.isHeading" class="mb-3 px-2 pt-4 first:pt-0">
+                            <p class="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em]">{{ item.label }}</p>
+                        </div>
 
-                            <!-- Dropdown Module -->
-                            <div v-else-if="item.isDropdown" class="space-y-1">
-                                <button @click="item.toggle" :class="[
-                                    item.isOpen ? 'text-blue-600 bg-white/50 dark:bg-gray-900/50' : 'text-gray-500 dark:text-gray-400',
-                                    'w-full flex items-center justify-between px-3 py-3.5 text-[14px] font-bold rounded-xl hover:bg-white/50 dark:hover:bg-gray-900/50 transition-all duration-300'
-                                ]">
-                                    <div class="flex items-center">
-                                        <div :class="[item.isOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400']"
-                                            class="p-2 rounded-lg mr-3 transition-colors duration-300">
-                                            <component :is="item.icon" class="h-5 w-5" />
-                                        </div>
-                                        <span class="truncate tracking-tight">{{ item.label }}</span>
-                                    </div>
-                                    <ChevronRight
-                                        :class="['h-4 w-4 transition-transform duration-300', item.isOpen ? 'rotate-90' : 'text-gray-400']" />
-                                </button>
-
-                                <div v-show="item.isOpen" class="pl-12 space-y-1 mt-1 transition-all">
-                                    <template v-for="subItem in item.children" :key="subItem.label">
-                                        <div v-if="subItem.isDivider" class="text-[10px] text-gray-400 py-1 px-2">{{ subItem.label }}</div>
-                                        <Link v-else :href="subItem.href" @click="handleNavClick" :class="[
-                                            isActive(subItem.href) ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-                                        ]" class="flex items-center py-2.5 text-[13px] font-bold transition-colors">
-                                            <component :is="subItem.icon" class="h-4 w-4 mr-3" />
-                                            {{ subItem.label }}
-                                        </Link>
-                                    </template>
-                                </div>
-                            </div>
-
-                            <!-- Direct Link -->
-                            <Link v-else :href="item.href" @click="handleNavClick" :class="[
-                                isActive(item.href)
-                                    ? isSupplier
-                                        ? 'bg-white dark:bg-gray-900 text-emerald-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
-                                        : 'bg-white dark:bg-gray-900 text-blue-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
-                                    : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-900/50 hover:text-gray-900 dark:hover:text-white'
-                            ]" class="group relative flex items-center justify-between px-3 py-3 text-[14px] font-bold rounded-xl transition-all duration-300">
-                                <div v-if="isActive(item.href)" :class="isSupplier ? 'bg-emerald-600' : 'bg-blue-600'"
-                                    class="absolute left-0 top-1/4 bottom-1/4 w-0.5 rounded-r-full"></div>
-                                <div class="flex items-center relative z-10">
-                                    <div :class="[
-                                        isActive(item.href)
-                                            ? isSupplier
-                                                ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600'
-                                                : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600'
-                                            : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'
-                                    ]" class="p-2 rounded-lg transition-colors duration-300 mr-3">
-                                        <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                        <!-- Dropdown Module -->
+                        <div v-else-if="item.isDropdown" class="space-y-1">
+                            <button @click="item.toggle" :class="[
+                                item.isOpen ? 'text-blue-600 bg-white/50 dark:bg-gray-900/50' : 'text-gray-500 dark:text-gray-400',
+                                'w-full flex items-center justify-between px-3 py-3.5 text-[14px] font-bold rounded-xl hover:bg-white/50 dark:hover:bg-gray-900/50 transition-all duration-300'
+                            ]">
+                                <div class="flex items-center">
+                                    <div :class="[item.isOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400']"
+                                        class="p-2 rounded-lg mr-3 transition-colors duration-300">
+                                        <component :is="item.icon" class="h-5 w-5" />
                                     </div>
                                     <span class="truncate tracking-tight">{{ item.label }}</span>
                                 </div>
-                            </Link>
-                        </template>
-                    </nav>
-                </div>
-
-                <!-- User Profile Section -->
-                <div class="p-4 mt-auto border-t border-gray-100 dark:border-gray-800">
-                    <div
-                        class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md rounded-2xl p-3 border border-gray-100/50 dark:border-gray-800/50 shadow-lg">
-                        <div class="flex items-center gap-3 relative z-10">
-                            <div class="relative flex-shrink-0">
-                                <img v-if="userPhotoUrl" :src="userPhotoUrl" alt="Profile"
-                                    class="h-10 w-10 rounded-xl object-cover shadow-lg"
-                                    :class="isSupplier ? 'shadow-emerald-500/30' : 'shadow-blue-500/30'" />
-                                <div v-else :class="isSupplier
-                                    ? 'from-emerald-600 to-teal-700 shadow-emerald-500/30'
-                                    : 'from-blue-600 to-indigo-700 shadow-blue-500/30'"
-                                    class="h-10 w-10 rounded-xl bg-gradient-to-br flex items-center justify-center text-white text-sm font-black shadow-lg uppercase">
-                                    {{ displayInitial }}
-                                </div>
-                                <div
-                                    class="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full">
-                                </div>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p
-                                    class="text-xs font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
-                                    {{ displayName }}
-                                </p>
-                                <div class="flex items-center gap-1 mt-0.5 mb-1">
-                                    <Building2 class="h-3 w-3 text-gray-400" />
-                                    <span :class="isSupplier ? 'text-emerald-600' : 'text-blue-600'"
-                                        class="text-[9px] font-black uppercase truncate">
-                                        {{ displayDepartment }}
-                                    </span>
-                                </div>
-                                <div class="flex items-center gap-1">
-                                    <ShieldCheck :class="isSupplier ? 'text-emerald-500' : 'text-blue-500'"
-                                        class="h-3 w-3" />
-                                    <span class="text-[9px] font-black text-gray-400 uppercase truncate">
-                                        {{ displayPosition }}
-                                    </span>
-                                </div>
-                            </div>
-                            <button @click.stop="showLogoutModal = true; isOpen = false"
-                                class="p-2.5 rounded-xl bg-gray-100/80 dark:bg-gray-800/80 text-gray-400 hover:text-red-500 hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-all duration-300 backdrop-blur-sm">
-                                <LogOut class="h-4 w-4" />
+                                <ChevronRight
+                                    :class="['h-4 w-4 transition-transform duration-300', item.isOpen ? 'rotate-90' : 'text-gray-400']" />
                             </button>
+
+                            <div v-show="item.isOpen" class="pl-12 space-y-1 mt-1 transition-all">
+                                <template v-for="subItem in item.children" :key="subItem.label">
+                                    <div v-if="subItem.isDivider" class="text-[10px] text-gray-400 py-1 px-2">{{ subItem.label }}</div>
+                                    <Link v-else :href="subItem.href" @click="handleNavClick" :class="[
+                                        isActive(subItem.href) ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                                    ]" class="flex items-center py-2.5 text-[13px] font-bold transition-colors">
+                                        <component :is="subItem.icon" class="h-4 w-4 mr-3" />
+                                        {{ subItem.label }}
+                                    </Link>
+                                </template>
+                            </div>
                         </div>
 
-                        <!-- Manufacturing Supervisor Role Switcher -->
-                        <div v-if="isManufacturingSupervisor && supervisorRoles.length > 0"
-                            class="mt-3 pt-3 border-t border-gray-200/50 dark:border-gray-700/50">
-                            <p class="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                                <UserCog2 class="w-3 h-3" /> SWITCH ROLE
-                            </p>
-                            <div class="space-y-1">
-                                <button v-for="role in supervisorRoles" :key="role.manufacturing_role"
-                                    @click="switchManufacturingRole(role.manufacturing_role)"
-                                    :class="[
-                                        activeManufacturingRole === role.manufacturing_role
-                                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
-                                            : 'bg-gray-100/70 dark:bg-gray-800/70 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                                    ]"
-                                    class="w-full text-left text-[11px] font-medium px-2 py-1.5 rounded-lg transition-all">
-                                    {{ formatRoleLabel(role.manufacturing_role) }}
-                                    <span v-if="activeManufacturingRole === role.manufacturing_role"
-                                        class="float-right text-blue-500">✓</span>
-                                </button>
+                        <!-- Direct Link -->
+                        <Link v-else :href="item.href" @click="handleNavClick" :class="[
+                            isActive(item.href)
+                                ? isSupplier
+                                    ? 'bg-white dark:bg-gray-900 text-emerald-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
+                                    : 'bg-white dark:bg-gray-900 text-blue-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
+                                : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-900/50 hover:text-gray-900 dark:hover:text-white'
+                        ]" class="group relative flex items-center justify-between px-3 py-3 text-[14px] font-bold rounded-xl transition-all duration-300">
+                            <div v-if="isActive(item.href)" :class="isSupplier ? 'bg-emerald-600' : 'bg-blue-600'"
+                                class="absolute left-0 top-1/4 bottom-1/4 w-0.5 rounded-r-full"></div>
+                            <div class="flex items-center relative z-10">
+                                <div :class="[
+                                    isActive(item.href)
+                                        ? isSupplier
+                                            ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600'
+                                            : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600'
+                                        : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'
+                                ]" class="p-2 rounded-lg transition-colors duration-300 mr-3">
+                                    <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                                </div>
+                                <span class="truncate tracking-tight">{{ item.label }}</span>
                             </div>
+                        </Link>
+                    </template>
+                </nav>
+            </div>
+
+            <!-- User Profile Section -->
+            <div class="p-4 mt-auto border-t border-gray-100 dark:border-gray-800">
+                <div
+                    class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md rounded-2xl p-3 border border-gray-100/50 dark:border-gray-800/50 shadow-lg">
+                    <div class="flex items-center gap-3 relative z-10">
+                        <div class="relative flex-shrink-0">
+                            <img v-if="userPhotoUrl" :src="userPhotoUrl" alt="Profile"
+                                class="h-10 w-10 rounded-xl object-cover shadow-lg"
+                                :class="isSupplier ? 'shadow-emerald-500/30' : 'shadow-blue-500/30'" />
+                            <div v-else :class="isSupplier
+                                ? 'from-emerald-600 to-teal-700 shadow-emerald-500/30'
+                                : 'from-blue-600 to-indigo-700 shadow-blue-500/30'"
+                                class="h-10 w-10 rounded-xl bg-gradient-to-br flex items-center justify-center text-white text-sm font-black shadow-lg uppercase">
+                                {{ displayInitial }}
+                            </div>
+                            <div
+                                class="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full">
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p
+                                class="text-xs font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
+                                {{ displayName }}
+                            </p>
+                            <div class="flex items-center gap-1 mt-0.5 mb-1">
+                                <Building2 class="h-3 w-3 text-gray-400" />
+                                <span :class="isSupplier ? 'text-emerald-600' : 'text-blue-600'"
+                                    class="text-[9px] font-black uppercase truncate">
+                                    {{ displayDepartment }}
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <ShieldCheck :class="isSupplier ? 'text-emerald-500' : 'text-blue-500'"
+                                    class="h-3 w-3" />
+                                <span class="text-[9px] font-black text-gray-400 uppercase truncate">
+                                    {{ displayPosition }}
+                                </span>
+                            </div>
+                        </div>
+                        <button @click.stop="showLogoutModal = true; isOpen = false"
+                            class="p-2.5 rounded-xl bg-gray-100/80 dark:bg-gray-800/80 text-gray-400 hover:text-red-500 hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-all duration-300 backdrop-blur-sm">
+                            <LogOut class="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <!-- Manufacturing Supervisor Role Switcher -->
+                    <div v-if="isManufacturingSupervisor && supervisorRoles.length > 0"
+                        class="mt-3 pt-3 border-t border-gray-200/50 dark:border-gray-700/50">
+                        <p class="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                            <UserCog2 class="w-3 h-3" /> SWITCH ROLE
+                        </p>
+                        <div class="space-y-1">
+                            <button v-for="role in supervisorRoles" :key="role.manufacturing_role"
+                                @click="switchManufacturingRole(role.manufacturing_role)"
+                                :class="[
+                                    activeManufacturingRole === role.manufacturing_role
+                                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
+                                        : 'bg-gray-100/70 dark:bg-gray-800/70 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                                ]"
+                                class="w-full text-left text-[11px] font-medium px-2 py-1.5 rounded-lg transition-all">
+                                {{ formatRoleLabel(role.manufacturing_role) }}
+                                <span v-if="activeManufacturingRole === role.manufacturing_role"
+                                    class="float-right text-blue-500">✓</span>
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-        </transition>
+        </div>
 
         <!-- Logout Modal -->
         <Teleport to="body">

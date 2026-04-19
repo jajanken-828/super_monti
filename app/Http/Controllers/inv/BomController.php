@@ -13,35 +13,35 @@ use Inertia\Inertia;
 class BomController extends Controller
 {
     /**
-     * Display a listing of BOM records.
+     * Display a listing of recipe records (formerly BOM).
      */
     public function index()
     {
-        $boms = BomRecord::with('client', 'product')->get();
+        $recipes = BomRecord::with('client', 'product')->get();
         $clients = Client::all();
         $products = Product::all();
         $materials = Material::all();
 
         return Inertia::render('Dashboard/Inventory/Bom', [
-            'boms' => $boms,
-            'clients' => $clients,
-            'products' => $products,
+            'boms'      => $recipes,       // Keep prop name 'boms' for compatibility with the Vue file
+            'clients'   => $clients,
+            'products'  => $products,
             'materials' => $materials,
         ]);
     }
 
     /**
-     * Store a newly created BOM record.
+     * Store a newly created recipe.
      */
     public function store(Request $request)
     {
         $data = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'product_id' => 'required|exists:products,id',
-            'yarn_type' => 'required|string',
-            'dye_color' => 'required|string',
+            'client_id'    => 'required|exists:clients,id',
+            'product_id'   => 'required|exists:products,id',
+            'yarn_type'    => 'required|string',
+            'dye_color'    => 'required|string',
             'weave_design' => 'required|string',
-            'materials' => 'required|array',
+            'materials'    => 'required|array',
         ]);
 
         BomRecord::updateOrCreate(
@@ -49,38 +49,38 @@ class BomController extends Controller
             $data
         );
 
-        return redirect()->back()->with('success', 'BOM saved successfully.');
+        return redirect()->back()->with('success', 'Recipe saved successfully.');
     }
 
     /**
-     * Update the specified BOM record.
+     * Update the specified recipe.
      */
     public function update(Request $request, $id)
     {
-        $bom = BomRecord::findOrFail($id);
+        $recipe = BomRecord::findOrFail($id);
 
         $data = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'product_id' => 'required|exists:products,id',
-            'yarn_type' => 'required|string',
-            'dye_color' => 'required|string',
+            'client_id'    => 'required|exists:clients,id',
+            'product_id'   => 'required|exists:products,id',
+            'yarn_type'    => 'required|string',
+            'dye_color'    => 'required|string',
             'weave_design' => 'required|string',
-            'materials' => 'required|array',
+            'materials'    => 'required|array',
         ]);
 
-        $bom->update($data);
+        $recipe->update($data);
 
-        return redirect()->back()->with('success', 'BOM updated successfully.');
+        return redirect()->back()->with('success', 'Recipe updated successfully.');
     }
 
     /**
-     * Remove the specified BOM record.
+     * Remove the specified recipe.
      */
     public function destroy($id)
     {
-        $bom = BomRecord::findOrFail($id);
-        $bom->delete();
+        $recipe = BomRecord::findOrFail($id);
+        $recipe->delete();
 
-        return redirect()->back()->with('success', 'BOM deleted successfully.');
+        return redirect()->back()->with('success', 'Recipe deleted successfully.');
     }
 }

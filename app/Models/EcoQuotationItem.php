@@ -3,13 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class EcoQuotationItem extends Model
 {
-    use HasFactory;
-
-    // Specifies exactly which table to use
     protected $table = 'eco_quotation_items';
 
     protected $fillable = [
@@ -19,25 +15,23 @@ class EcoQuotationItem extends Model
         'design',
         'color',
         'kilos',
-        'price'
+        'unit_price',
+        'price',
     ];
 
     protected $casts = [
-        'kilos' => 'float',
-        'price' => 'float',
+        'kilos'      => 'decimal:2',
+        'unit_price' => 'decimal:2',
+        'price'      => 'decimal:2',
     ];
 
-    /**
-     * Relationship: This item belongs back to the main Quotation.
-     */
+    // ── Relationships ────────────────────────────────────────────────────────
+
     public function quotation()
     {
         return $this->belongsTo(EcoQuotation::class, 'eco_quotation_id');
     }
 
-    /**
-     * Relationship: Link to the master product in inventory.
-     */
     public function product()
     {
         return $this->belongsTo(\App\Models\inv\Product::class, 'product_id');
