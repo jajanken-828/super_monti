@@ -299,7 +299,7 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
 
     // Analytics (page: analytics)
     Route::get('/analytics', [AnalyticsController::class, 'index'])
-        ->middleware(['page.permission:analytics,view', 'geofence'])
+        ->middleware('page.permission:analytics,view')
         ->name('analytics');
 
     // Positions (no page permission needed, used internally)
@@ -354,7 +354,7 @@ Route::prefix('dashboard/workforce')->name('workforce.')->middleware(['auth', 'v
 | Supply Chain Management (SCM) Routes
 |--------------------------------------------------------------------------
 */
-Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified', 'module.access:SCM', 'geofence'])->group(function () {
+Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified', 'module.access:SCM'])->group(function () {
     // Sales Orders (from ECO)
     Route::get('/sales-orders', [ScmSalesOrderController::class, 'index'])->name('sales-orders');
     Route::post('/sales-orders/{order}/check-inventory', [ScmSalesOrderController::class, 'checkInventory'])->name('sales-order.check-inventory');
@@ -383,18 +383,18 @@ Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified', 'm
 | Financial Operations (FIN) Routes
 |--------------------------------------------------------------------------
 */
-Route::prefix('dashboard/fin')->name('fin.')->middleware(['auth', 'verified', 'geofence'])->group(function () {
+Route::prefix('dashboard/fin')->name('fin.')->middleware(['auth', 'verified'])->group(function () {
     Route::get('/interview', [InterviewController::class, 'index'])->name('interview.index');
     Route::get('/trainee', [TraineeController::class, 'index'])->name('trainee.index');
     Route::get('/access', [AccessController::class, 'index'])->name('access.index');
     Route::post('/access/update', [AccessController::class, 'update'])->name('access.update');
 
     Route::get('/manager', [FinDashboardController::class, 'managerDashboard'])
-        ->middleware(['module.access:FIN', 'position:manager', 'geofence'])
+        ->middleware(['module.access:FIN', 'position:manager'])
         ->name('manager.dashboard');
 
     Route::get('/staff', [FinDashboardController::class, 'staffDashboard'])
-        ->middleware(['module.access:FIN', 'position:staff', 'geofence'])
+        ->middleware(['module.access:FIN', 'position:staff'])
         ->name('employee.dashboard');
 });
 
@@ -403,14 +403,14 @@ Route::prefix('dashboard/fin')->name('fin.')->middleware(['auth', 'verified', 'g
 | Manufacturing Plant (MAN) Routes
 |--------------------------------------------------------------------------
 */
-Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'module.access:MAN', 'geofence'])->group(function () {
+Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'module.access:MAN'])->group(function () {
     Route::get('/interview', [InterviewController::class, 'index'])->name('interview.index');
     Route::get('/trainee', [TraineeController::class, 'index'])->name('trainee.index');
     Route::get('/access', [AccessController::class, 'index'])->name('access.index');
 
     // Manager access control (supervisor management)
     // Accessible by manufacturing managers (position=manager) AND elevated secretaries/GMs with MAN module
-    Route::middleware(['can.access.man.manager', 'geofence'])->group(function () {
+    Route::middleware(['can.access.man.manager'])->group(function () {
         Route::get('/access/manage', [ManAccessController::class, 'index'])->name('access.manage');
         Route::post('/access/assign-supervisor', [ManAccessController::class, 'assignSupervisor'])->name('access.assign-supervisor');
         // Note: updateSupervisorRoles method is removed; no route needed.
@@ -418,12 +418,12 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
 
     // Staff dashboard entry point (redirects to role-specific dashboard or supervisor manager dashboard)
     Route::get('/staff', [ManDashboardController::class, 'staffDashboard'])
-        ->middleware(['module.access:MAN', 'position:staff', 'geofence'])
+        ->middleware(['module.access:MAN', 'position:staff'])
         ->name('employee.dashboard');
 
     // Manufacturing Manager Dashboard & Functions
     // Accessible by both 'manager' position users, manufacturing supervisors, AND elevated secretaries/GMs with MAN module
-    Route::middleware(['can.access.man.manager', 'geofence'])->group(function () {
+    Route::middleware(['can.access.man.manager'])->group(function () {
         Route::get('/', [ManufacturingManagerController::class, 'index'])->name('manager.dashboard');
         Route::get('/production', [ManufacturingManagerController::class, 'production'])->name('manager.production');
         Route::get('/rejected', [ManufacturingManagerController::class, 'rejected'])->name('manager.rejected');
@@ -536,7 +536,7 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
             });
 
         Route::prefix('checker-quality')->name('staff.checker-quality.')->controller(CheckerQualityController::class)
-            ->middleware(['man.role:checker_quality', 'geofence'])
+            ->middleware(['man.role:checker_quality'])
             ->group(function () {
                 Route::get('/', 'index')->name('dashboard');
                 Route::get('/production', 'production')->name('production');
@@ -559,7 +559,7 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
 | Warehouse Module
 |--------------------------------------------------------------------------
 */
-Route::prefix('dashboard/warehouse')->name('warehouse.')->middleware(['auth', 'verified', 'module.access:WAR', 'geofence'])->group(function () {
+Route::prefix('dashboard/warehouse')->name('warehouse.')->middleware(['auth', 'verified', 'module.access:WAR'])->group(function () {
     // General Warehouse Management
     Route::get('/', [WarehouseController::class, 'index'])->name('index');
     Route::post('/', [WarehouseController::class, 'store'])->name('store');
@@ -596,7 +596,7 @@ Route::prefix('dashboard/warehouse')->name('warehouse.')->middleware(['auth', 'v
 | Inventory Module
 |--------------------------------------------------------------------------
 */
-Route::prefix('dashboard/inventory')->name('inv.')->middleware(['auth', 'verified', 'module.access:INV', 'geofence'])->group(function () {
+Route::prefix('dashboard/inventory')->name('inv.')->middleware(['auth', 'verified', 'module.access:INV'])->group(function () {
     Route::get('/', [InvDashboardController::class, 'managerDashboard'])->name('dashboard');
     Route::get('/materials', [MaterialController::class, 'material'])->name('materials');
     Route::post('/materials', [MaterialController::class, 'store'])->name('materials.store');

@@ -30,12 +30,12 @@ class DyeingPackagingController extends ManufacturingStaffController
 
     public function packaging()
     {
-        $availableForms = FormJob::with('product')
+        $formingJobs = FormJob::with(['ironJob.squeezerJob.softenerJob.fabric', 'product'])
             ->whereDoesntHave('packageItems')
             ->get();
 
-        return Inertia::render('Dashboard/MAN/Employee/DyeingPackaging/Packaging', [
-            'availableForms' => $availableForms,
+        return Inertia::render('Dashboard/MAN/Employee/DyeingPackaging/DyeingPackaging', [
+            'formingJobs' => $formingJobs,
         ]);
     }
 

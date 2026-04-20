@@ -431,7 +431,8 @@ const navItems = computed(() => {
             { label: 'Dashboard', href: route('man.manager.dashboard'), icon: Factory, permKey: 'dashboard' },
             { label: 'Production Orders', href: route('man.manager.production'), icon: ClipboardList, permKey: 'production' },
             { label: 'Rejected Items', href: route('man.manager.rejected'), icon: XCircle, permKey: 'reject' },
-            { label: 'Quality Checker', href: route('man.manager.checker-quality.dashboard'), icon: CheckCircle2, permKey: 'checker' },
+            // FIX: replaced broken named route with direct URL
+            { label: 'Quality Checker', href: '/dashboard/man/checker-quality', icon: CheckCircle2, permKey: 'checker' },
             { label: 'Interviews', href: route('man.interview.index'), icon: Eye, permKey: 'interview' },
             { label: 'Trainees', href: route('man.trainee.index'), icon: Award, permKey: 'trainee' },
         ]

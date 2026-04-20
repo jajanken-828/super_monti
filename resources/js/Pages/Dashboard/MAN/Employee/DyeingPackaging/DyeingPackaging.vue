@@ -1,208 +1,143 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { useForm, router } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { useForm, router, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Package, AlertCircle, Plus, Trash2 } from 'lucide-vue-next';
+import { Package, AlertCircle, X } from 'lucide-vue-next';
 
 const props = defineProps({
-    availableForms: Array,    // { id, code, product_name, total_quantity, remaining_quantity }
-    recentPackages: Array,    // { id, code, items, packaged_at, status }
+    formingJobs: {
+        type: Array,
+        default: () => []
+    },
 });
 
-// Selected items for the new package
-const selectedItems = ref([]);
+const showPackageModal = ref(false);
+const currentFormingJob = ref(null);
 
-// Form for creating package
 const form = useForm({
     items: [],
+    remarks: '',
 });
 
-const addItem = () => {
-    selectedItems.value.push({
-        form_job_id: '',
-        quantity: 1,
-        max_quantity: 0,
-    });
+const openPackageModal = (formingJob) => {
+    currentFormingJob.value = formingJob;
+    form.items = [{ form_job_id: formingJob.id, quantity: 1 }];
+    form.remarks = '';
+    showPackageModal.value = true;
 };
 
-const removeItem = (index) => {
-    selectedItems.value.splice(index, 1);
-};
-
-// Update max quantity when form job changes
-const updateMaxQuantity = (index) => {
-    const formJob = props.availableForms.find(f => f.id === selectedItems.value[index].form_job_id);
-    if (formJob) {
-        selectedItems.value[index].max_quantity = formJob.remaining_quantity;
-        if (selectedItems.value[index].quantity > formJob.remaining_quantity) {
-            selectedItems.value[index].quantity = formJob.remaining_quantity;
-        }
-    }
+const closeModal = () => {
+    showPackageModal.value = false;
+    form.reset();
+    currentFormingJob.value = null;
 };
 
 const submitPackage = () => {
-    // Filter out items without a selected form job
-    const validItems = selectedItems.value.filter(item => item.form_job_id);
-    if (validItems.length === 0) {
-        alert('Please select at least one product to package.');
-        return;
-    }
-    form.items = validItems.map(item => ({
-        form_job_id: item.form_job_id,
-        quantity: item.quantity,
-    }));
     form.post(route('man.staff.dyeing-packaging.store-package'), {
         preserveScroll: true,
         onSuccess: () => {
-            selectedItems.value = [];
-            form.reset();
-            router.reload({ only: ['availableForms', 'recentPackages'] });
+            closeModal();
+            router.reload({ only: ['formingJobs'] });
         },
     });
-};
-
-const formatDate = (date) => {
-    return new Date(date).toLocaleString();
 };
 </script>
 
 <template>
-    <AuthenticatedLayout title="Packaging">
+    <AuthenticatedLayout title="Dyeing Packaging">
         <div class="p-6 max-w-7xl mx-auto">
             <div class="flex justify-between items-center mb-6">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Packaging Workspace</h1>
+                <!-- FIXED: use 'dashboard' instead of 'index' -->
                 <Link :href="route('man.staff.dyeing-packaging.dashboard')"
                     class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-bold">
-                Back to Dashboard
+                    Back to Dashboard
                 </Link>
             </div>
 
-            <!-- Available Products Section -->
-            <div
-                class="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 mb-8">
-                <div class="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Available Products</h2>
-                    <p class="text-sm text-gray-500">Products ready for packaging</p>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-50 dark:bg-zinc-800/50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total
-                                    Quantity</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remaining
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <tr v-for="form in availableForms" :key="form.id">
-                                <td class="px-6 py-4 font-mono text-sm">{{ form.code }}</td>
-                                <td class="px-6 py-4">{{ form.product_name }}</td>
-                                <td class="px-6 py-4">{{ form.total_quantity }}</td>
-                                <td class="px-6 py-4 font-bold text-green-600">{{ form.remaining_quantity }}</td>
-                            </tr>
-                            <tr v-if="availableForms.length === 0">
-                                <td colspan="4" class="px-6 py-12 text-center text-gray-500">
-                                    No products available for packaging.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Create Package Section -->
-            <div
-                class="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 mb-8">
-                <div class="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Create New Package</h2>
-                </div>
-
-                <div class="p-6">
-                    <div class="space-y-4">
-                        <div v-for="(item, index) in selectedItems" :key="index"
-                            class="flex flex-wrap gap-4 items-end border-b border-gray-100 pb-4">
-                            <div class="flex-1 min-w-[200px]">
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select
-                                    Product</label>
-                                <select v-model="item.form_job_id" @change="updateMaxQuantity(index)"
-                                    class="w-full border border-gray-300 dark:border-zinc-700 rounded-lg p-2 bg-white dark:bg-zinc-800">
-                                    <option value="">Choose a product</option>
-                                    <option v-for="form in availableForms" :key="form.id" :value="form.id">
-                                        {{ form.code }} - {{ form.product_name }} ({{ form.remaining_quantity }} left)
-                                    </option>
-                                </select>
+            <div v-if="formingJobs && formingJobs.length > 0"
+                class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div v-for="job in formingJobs" :key="job.id"
+                    class="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 overflow-hidden hover:shadow-md transition">
+                    <div class="p-5">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <p class="font-mono text-sm font-bold text-indigo-600 dark:text-indigo-400">{{ job.code }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Fabric: {{ job.iron_job?.squeezer_job?.softener_job?.fabric?.code || 'N/A' }}</p>
                             </div>
-                            <div class="w-32">
-                                <label
-                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
-                                <input type="number" v-model.number="item.quantity" :max="item.max_quantity" min="1"
-                                    class="w-full border border-gray-300 dark:border-zinc-700 rounded-lg p-2 bg-white dark:bg-zinc-800"
-                                    :disabled="!item.form_job_id" />
-                            </div>
-                            <button @click="removeItem(index)" class="mt-5 text-red-600 hover:text-red-800">
-                                <Trash2 class="w-5 h-5" />
-                            </button>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold">Ready for Packaging</span>
                         </div>
 
-                        <button @click="addItem"
-                            class="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium">
-                            <Plus class="w-4 h-4" /> Add Product
-                        </button>
+                        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                            <p><span class="font-medium">Iron Job:</span> {{ job.iron_job?.code || 'N/A' }}</p>
+                            <p><span class="font-medium">Operator:</span> {{ job.operator?.name }}</p>
+                            <p><span class="font-medium">Shift:</span> {{ job.shift }}</p>
+                            <p><span class="font-medium">Date:</span> {{ new Date(job.processed_at).toLocaleString() }}</p>
+                            <p v-if="job.remarks"><span class="font-medium">Remarks:</span> {{ job.remarks }}</p>
+                        </div>
 
-                        <div class="pt-4">
-                            <button @click="submitPackage" :disabled="form.processing || selectedItems.length === 0"
-                                class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50">
-                                <Package class="w-4 h-4" />
-                                {{ form.processing ? 'Creating Package...' : 'Create Package' }}
+                        <div class="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-800">
+                            <button @click="openPackageModal(job)"
+                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2">
+                                <Package class="w-4 h-4" /> Create Package
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Recent Packages Section -->
-            <div class="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800">
-                <div class="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Recent Packages</h2>
+            <div v-else
+                class="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 p-12 text-center">
+                <AlertCircle class="w-12 h-12 mx-auto text-gray-400 mb-3" />
+                <p class="text-gray-500 dark:text-gray-400">No forming jobs ready for packaging at the moment.</p>
+            </div>
+        </div>
+
+        <!-- Package Modal -->
+        <div v-if="showPackageModal"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            @click.self="closeModal">
+            <div
+                class="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-200 dark:border-zinc-800">
+                <div
+                    class="flex justify-between items-center p-6 border-b border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Create Package</h3>
+                    <button @click="closeModal" class="hover:opacity-70">
+                        <X class="w-5 h-5 text-gray-500" />
+                    </button>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-50 dark:bg-zinc-800/50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <tr v-for="pkg in recentPackages" :key="pkg.id">
-                                <td class="px-6 py-4 font-mono text-sm">{{ pkg.code }}</td>
-                                <td class="px-6 py-4">
-                                    <div v-for="item in pkg.items" :key="item.id" class="text-sm">
-                                        {{ item.quantity }}x {{ item.form_job?.product?.name || 'Product' }}
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">{{ formatDate(pkg.packaged_at) }}</td>
-                                <td class="px-6 py-4">
-                                    <span
-                                        :class="pkg.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'"
-                                        class="px-2 py-1 rounded text-xs font-bold">
-                                        {{ pkg.status }}
-                                    </span>
-                                </td>
-                            </tr>
-                            <tr v-if="recentPackages.length === 0">
-                                <td colspan="4" class="px-6 py-12 text-center text-gray-500">
-                                    No packages created yet.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+
+                <form @submit.prevent="submitPackage" class="p-6 space-y-4">
+                    <div class="bg-gray-50 dark:bg-zinc-800 p-3 rounded-lg">
+                        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Forming Job: <span
+                                class="font-mono">{{ currentFormingJob?.code }}</span></p>
+                        <p class="text-sm text-gray-500">Fabric: {{ currentFormingJob?.iron_job?.squeezer_job?.softener_job?.fabric?.code }}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity (rolls/pieces)</label>
+                        <input type="number" v-model="form.items[0].quantity" min="1"
+                            class="w-full border border-gray-300 dark:border-zinc-700 rounded-lg p-2 bg-white dark:bg-zinc-800" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Remarks</label>
+                        <textarea v-model="form.remarks" rows="3"
+                            class="w-full border border-gray-300 dark:border-zinc-700 rounded-lg p-2 bg-white dark:bg-zinc-800"
+                            placeholder="Optional notes..."></textarea>
+                    </div>
+
+                    <div class="flex gap-3 pt-2">
+                        <button type="submit" :disabled="form.processing"
+                            class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold transition">
+                            {{ form.processing ? 'Processing...' : 'Create Package' }}
+                        </button>
+                        <button type="button" @click="closeModal"
+                            class="flex-1 bg-gray-200 dark:bg-zinc-700 hover:bg-gray-300 dark:hover:bg-zinc-600 text-gray-800 dark:text-gray-200 py-2 rounded-lg font-bold transition">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </AuthenticatedLayout>
