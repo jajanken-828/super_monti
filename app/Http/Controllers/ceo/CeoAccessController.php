@@ -137,7 +137,6 @@ class CeoAccessController extends Controller
         'dyeing_forming' => 'Dyeing Forming Staff',
         'dyeing_packaging' => 'Dyeing Packaging Staff',
         'maintenance_checker' => 'Maintenance Checker Staff',
-        'checker_quality' => 'Quality Checker Staff',
     ];
 
     // -----------------------------------------------------------------------
@@ -690,7 +689,7 @@ class CeoAccessController extends Controller
     {
         $request->validate([
             'user_id' => 'required|exists:users,id',
-            'manufacturing_role' => 'nullable|in:knitting_yarn,dyeing_color,dyeing_fabric_softener,dyeing_squeezer,dyeing_ironing,dyeing_forming,dyeing_packaging,maintenance_checker,checker_quality',
+            'manufacturing_role' => 'nullable|in:knitting_yarn,dyeing_color,dyeing_fabric_softener,dyeing_squeezer,dyeing_ironing,dyeing_forming,dyeing_packaging,maintenance_checker',
             'log_role' => 'nullable|in:driver,conductor',
             'supervisor_department' => 'nullable|in:knitting,dyeing,maintenance',
         ]);

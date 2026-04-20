@@ -116,15 +116,28 @@ class ScmSalesOrderController extends Controller
 
     /**
      * Check inventory for a Sales Order (pushed from ECO)
+     * Now accepts a 'sufficient' boolean to set the order as ready for production.
      */
-    public function checkInventorySalesOrder(SalesOrder $salesOrder)
+    public function checkInventorySalesOrder(Request $request, SalesOrder $salesOrder)
     {
-        // Only allowed if currently in 'pushed_to_scm' state
+        // Only allowed if currently in 'pushed_to_scm' or 'inv_check' state
         if (!in_array($salesOrder->status, ['pushed_to_scm', 'inv_check'])) {
             return redirect()->back()->withErrors(['error' => 'Order is not in a state that allows inventory check.']);
         }
-        $salesOrder->update(['status' => 'inv_check']);
-        return redirect()->back()->with('success', 'Inventory check requested for sales order.');
+
+        $sufficient = $request->boolean('sufficient', false);
+        $newStatus = $sufficient ? 'inv_checked' : 'inv_check';
+
+        $salesOrder->update([
+            'status' => $newStatus,
+            'inv_check_sufficient' => $sufficient,
+        ]);
+
+        $message = $sufficient
+            ? 'Inventory check passed. Order marked as ready for production.'
+            : 'Inventory check completed. Insufficient stock – awaiting procurement.';
+
+        return redirect()->back()->with('success', $message);
     }
 
     /**

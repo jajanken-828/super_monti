@@ -124,20 +124,18 @@ const confirmDecline = () => {
                                 :class="res.status === 'accepted' ? 'border-green-200 bg-green-50' : res.status === 'declined' ? 'border-red-200 bg-red-50 opacity-70' : 'border-gray-200'">
                                 <div>
                                     <p class="font-bold">{{ res.supplier_name }}</p>
-                                    <p class="text-xs">Unit: {{ formatCurrency(res.unit_price) }} | Total: {{
-                                        formatCurrency(res.total_price) }} | Lead: {{ res.lead_time }}</p>
+                                    <p class="text-xs text-gray-600">Unit: {{ formatCurrency(res.unit_price) }} | Total (Inc. VAT): <span class="font-bold text-gray-900">{{ formatCurrency(res.total_price * 1.12) }}</span></p>
                                 </div>
                                 <div class="flex gap-2">
                                     <template v-if="res.status === 'pending_review'">
                                         <button @click="openAccept(rfq, res)"
-                                            class="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs">Accept</button>
+                                            class="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold">Accept</button>
                                         <button @click="openDecline(rfq, res)"
-                                            class="px-3 py-1 bg-red-600 text-white rounded-lg text-xs">Decline</button>
+                                            class="px-3 py-1 bg-red-600 text-white rounded-lg text-xs font-bold">Decline</button>
                                     </template>
                                     <span v-else-if="res.status === 'accepted'"
                                         class="text-emerald-600 text-xs font-bold">✓ Accepted</span>
-                                    <span v-else-if="res.status === 'declined'" class="text-red-600 text-xs font-bold">✗
-                                        Declined</span>
+                                    <span v-else-if="res.status === 'declined'" class="text-red-600 text-xs font-bold">✗ Declined</span>
                                 </div>
                             </div>
                         </div>
@@ -155,7 +153,7 @@ const confirmDecline = () => {
                     <div
                         class="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex-shrink-0">
                         <div>
-                            <h3 class="text-lg font-black flex items-center gap-2">
+                            <h3 class="text-lg font-black flex items-center gap-2 text-gray-900 dark:text-white">
                                 <FileText class="w-5 h-5 text-blue-500" /> RFQ Details
                             </h3>
                             <p class="text-xs font-mono font-bold text-gray-500 mt-1">{{ selectedRFQ.rfq_number }}</p>
@@ -170,26 +168,26 @@ const confirmDecline = () => {
                             class="grid grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
                             <div class="col-span-2">
                                 <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Target Material</p>
-                                <p class="text-sm font-black">{{ selectedRFQ.material_name }}</p>
+                                <p class="text-sm font-black text-gray-900 dark:text-white">{{ selectedRFQ.material_name }}</p>
                             </div>
                             <div>
                                 <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Required Qty</p>
-                                <p class="text-sm font-bold">{{ Number(selectedRFQ.required_qty).toLocaleString() }}
-                                    <span class="text-xs text-gray-500">{{ selectedRFQ.unit }}</span></p>
+                                <p class="text-sm font-bold text-gray-900 dark:text-white">{{ Number(selectedRFQ.required_qty).toLocaleString() }}
+                                    <span class="text-xs text-gray-500 ml-1">{{ selectedRFQ.unit }}</span></p>
                             </div>
                             <div>
                                 <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Deadline</p>
-                                <p class="text-sm font-bold">{{ selectedRFQ.deadline }}</p>
+                                <p class="text-sm font-bold text-gray-900 dark:text-white">{{ selectedRFQ.deadline }}</p>
                             </div>
                             <div class="col-span-2" v-if="selectedRFQ.notes">
                                 <p class="text-[10px] text-gray-400 uppercase font-bold mb-1">Notes</p>
-                                <p class="text-xs italic border-l-2 border-gray-200 pl-2">{{ selectedRFQ.notes }}</p>
+                                <p class="text-xs italic border-l-2 border-gray-200 pl-2 text-gray-600">{{ selectedRFQ.notes }}</p>
                             </div>
                         </div>
 
                         <div>
                             <p class="text-xs font-black flex items-center justify-between mb-3 border-b pb-2">
-                                <span>Supplier Responses</span>
+                                <span class="text-gray-900 dark:text-white uppercase tracking-tight">Supplier Responses</span>
                                 <span
                                     class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-[10px] uppercase tracking-widest">{{
                                     selectedRFQ.responses?.length || 0 }} Total</span>
@@ -197,28 +195,38 @@ const confirmDecline = () => {
                             <div v-if="!selectedRFQ.responses?.length" class="text-center py-6 text-gray-400 italic">
                                 Awaiting vendor responses...
                             </div>
-                            <div v-else class="space-y-3">
+                            <div v-else class="space-y-4">
                                 <div v-for="res in selectedRFQ.responses" :key="res.id"
-                                    :class="['p-3 rounded-xl border', res.status === 'accepted' ? 'border-green-200 bg-green-50' : res.status === 'declined' ? 'border-red-200 bg-red-50 opacity-70' : 'border-gray-200']">
+                                    :class="['p-4 rounded-xl border', res.status === 'accepted' ? 'border-green-200 bg-green-50' : res.status === 'declined' ? 'border-red-200 bg-red-50 opacity-70' : 'border-gray-200']">
                                     <div class="flex justify-between items-start mb-2">
-                                        <p class="font-black text-sm truncate">{{ res.supplier_name }}</p>
+                                        <p class="font-black text-sm truncate text-gray-900">{{ res.supplier_name }}</p>
                                         <span
                                             :class="['text-[9px] font-black uppercase px-2 py-0.5 rounded-md', statusBadge(res.status)]">{{
                                             statusLabel(res.status) }}</span>
                                     </div>
-                                    <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+                                    <div class="grid grid-cols-2 gap-4 mt-3 text-xs">
                                         <div>
-                                            <p class="text-[9px] text-gray-400 font-bold uppercase">Unit Price</p>
-                                            <p class="font-bold">{{ formatCurrency(res.unit_price) }}</p>
+                                            <p class="text-[9px] text-gray-400 font-bold uppercase mb-0.5">Unit Price</p>
+                                            <p class="font-bold text-gray-900">{{ formatCurrency(res.unit_price) }}</p>
                                         </div>
                                         <div>
-                                            <p class="text-[9px] text-gray-400 font-bold uppercase">Lead Time</p>
-                                            <p class="font-bold">{{ res.lead_time }}</p>
+                                            <p class="text-[9px] text-gray-400 font-bold uppercase mb-0.5">Lead Time</p>
+                                            <p class="font-bold text-gray-900">{{ res.lead_time }}</p>
                                         </div>
-                                        <div
-                                            class="col-span-2 pt-2 border-t border-gray-100 mt-1 flex justify-between items-center">
-                                            <p class="text-[10px] text-gray-400 font-bold uppercase">Total Value</p>
-                                            <p class="font-black text-sm">{{ formatCurrency(res.total_price) }}</p>
+                                        
+                                        <div class="col-span-2 pt-3 border-t border-gray-100 mt-1 space-y-1.5">
+                                            <div class="flex justify-between items-center text-gray-500">
+                                                <p class="text-[10px] font-bold uppercase">Subtotal</p>
+                                                <p class="font-bold text-[11px]">{{ formatCurrency(res.total_price) }}</p>
+                                            </div>
+                                            <div class="flex justify-between items-center text-blue-600">
+                                                <p class="text-[10px] font-bold uppercase">VAT (12%)</p>
+                                                <p class="font-bold text-[11px]">+ {{ formatCurrency(res.total_price * 0.12) }}</p>
+                                            </div>
+                                            <div class="flex justify-between items-center pt-1.5 border-t border-dashed border-gray-200 mt-1">
+                                                <p class="text-[10px] text-gray-900 font-black uppercase tracking-tight">Grand Total</p>
+                                                <p class="font-black text-sm text-gray-900">{{ formatCurrency(res.total_price * 1.12) }}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -234,70 +242,66 @@ const confirmDecline = () => {
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                 @click.self="showAcceptModal = false">
                 <div
-                    class="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    class="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md border border-gray-200 dark:border-gray-700 overflow-hidden shadow-2xl">
                     <div
                         class="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
-                        <h3 class="text-lg font-black flex items-center gap-2">
+                        <h3 class="text-lg font-black flex items-center gap-2 text-gray-900 dark:text-white">
                             <CheckCircle class="w-5 h-5 text-emerald-500" /> Accept Quotation
                         </h3>
                         <button @click="showAcceptModal = false"
-                            class="p-2 rounded-xl border border-gray-200 dark:border-gray-600">
+                            class="p-2 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-400">
                             <X class="w-4 h-4" />
                         </button>
                     </div>
                     <div class="p-5 space-y-5">
                         <div
-                            class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl p-4">
-                            <p class="text-[10px] font-black text-emerald-600 uppercase mb-3">Generating Purchase Order
-                                for:</p>
+                            class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl p-4 shadow-inner">
+                            <p class="text-[10px] font-black text-emerald-600 uppercase mb-3 tracking-widest text-center">Generating Purchase Order for:</p>
                             <div class="space-y-2 text-sm">
-                                <div class="flex justify-between">
-                                    <span class="font-semibold text-emerald-600 text-xs">Supplier</span>
-                                    <strong class="font-black truncate max-w-[180px]">{{
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-emerald-600 text-[10px] uppercase">Supplier</span>
+                                    <strong class="font-black text-gray-900 truncate max-w-[200px]">{{
                                         acceptTarget.response.supplier_name
                                         }}</strong>
                                 </div>
-                                <div class="flex justify-between">
-                                    <span class="font-semibold text-emerald-600 text-xs">Material</span>
-                                    <strong class="font-black">{{ acceptTarget.rfq.material_name }}</strong>
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-emerald-600 text-[10px] uppercase">Material</span>
+                                    <strong class="font-black text-gray-900">{{ acceptTarget.rfq.material_name }}</strong>
                                 </div>
-                                <div class="flex justify-between">
-                                    <span class="font-semibold text-emerald-600 text-xs">Quantity</span>
-                                    <strong class="font-black">{{ Number(acceptTarget.rfq.required_qty).toLocaleString()
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-emerald-600 text-[10px] uppercase">Quantity</span>
+                                    <strong class="font-black text-gray-900">{{ Number(acceptTarget.rfq.required_qty).toLocaleString()
                                         }} {{
                                         acceptTarget.rfq.unit }}</strong>
                                 </div>
-                                <div class="pt-3 mt-3 border-t border-emerald-200">
-                                    <div class="flex justify-between">
-                                        <span class="font-black uppercase text-[10px] text-emerald-600">Subtotal</span>
-                                        <strong>{{ formatCurrency(acceptTarget.response.total_price) }}</strong>
+                                
+                                <div class="pt-4 mt-4 border-t border-emerald-200/60">
+                                    <div class="flex justify-between items-center text-emerald-600/80 mb-1">
+                                        <span class="font-bold uppercase text-[10px]">Subtotal</span>
+                                        <span class="font-bold text-xs">{{ formatCurrency(acceptTarget.response.total_price) }}</span>
                                     </div>
-                                    <div class="flex justify-between mt-1">
-                                        <span class="font-black uppercase text-[10px] text-emerald-600">VAT (12%)</span>
-                                        <strong>{{ formatCurrency(acceptTarget.response.total_price * 0.12) }}</strong>
+                                    <div class="flex justify-between items-center text-emerald-600/80 mb-2">
+                                        <span class="font-bold uppercase text-[10px]">VAT (12%)</span>
+                                        <span class="font-bold text-xs">+ {{ formatCurrency(acceptTarget.response.total_price * 0.12) }}</span>
                                     </div>
-                                </div>
-                                <div class="pt-3 mt-1 border-t-2 border-emerald-300 border-dashed">
-                                    <div class="flex justify-between items-end">
-                                        <span class="font-black uppercase text-xs text-emerald-700 mb-0.5">Grand
-                                            Total</span>
-                                        <strong class="text-xl font-black">{{
-                                            formatCurrency(acceptTarget.response.total_price *
-                                            1.12) }}</strong>
+                                    <div class="pt-3 border-t-2 border-emerald-300 border-dashed">
+                                        <div class="flex justify-between items-end">
+                                            <span class="font-black uppercase text-xs text-emerald-700 mb-0.5">Grand Total</span>
+                                            <strong class="text-2xl font-black text-emerald-800">{{
+                                                formatCurrency(acceptTarget.response.total_price * 1.12) }}</strong>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 text-center">Accepting will decline all other quotes and create
-                            a draft
-                            PO.</p>
+                        <p class="text-[10px] text-gray-500 text-center uppercase font-bold tracking-tight px-4">Accepting will automatically <span class="text-red-500">decline</span> all other quotes for this RFQ.</p>
                     </div>
                     <div class="p-5 border-t border-gray-100 flex gap-3 bg-gray-50 dark:bg-gray-800">
                         <button @click="showAcceptModal = false"
-                            class="flex-1 py-2 border rounded-xl text-sm font-bold">Cancel</button>
+                            class="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-black uppercase text-gray-600">Cancel</button>
                         <button @click="confirmAccept" :disabled="isLoading"
-                            class="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2">
-                            <CheckCircle class="w-4 h-4" /> {{ isLoading ? 'Processing...' : 'Confirm & Create PO' }}
+                            class="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-emerald-200">
+                            <CheckCircle class="w-4 h-4" /> {{ isLoading ? 'Processing...' : 'Confirm Order' }}
                         </button>
                     </div>
                 </div>
@@ -309,14 +313,14 @@ const confirmDecline = () => {
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                 @click.self="showDeclineModal = false">
                 <div
-                    class="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    class="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md border border-gray-200 dark:border-gray-700 overflow-hidden shadow-2xl">
                     <div
                         class="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
-                        <h3 class="text-lg font-black flex items-center gap-2">
+                        <h3 class="text-lg font-black flex items-center gap-2 text-gray-900 dark:text-white">
                             <XCircle class="w-5 h-5 text-red-500" /> Decline Quotation
                         </h3>
                         <button @click="showDeclineModal = false"
-                            class="p-2 rounded-xl border border-gray-200 dark:border-gray-600">
+                            class="p-2 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-400">
                             <X class="w-4 h-4" />
                         </button>
                     </div>
@@ -336,14 +340,14 @@ const confirmDecline = () => {
                                 *</label>
                             <textarea v-model="declineReason" rows="3"
                                 placeholder="e.g. Price too high, better offer found..."
-                                class="w-full px-3 py-2.5 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl resize-none"></textarea>
+                                class="w-full px-3 py-2.5 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl resize-none focus:ring-red-500 focus:border-red-500 transition-all"></textarea>
                         </div>
                     </div>
                     <div class="p-5 border-t border-gray-100 flex gap-3 bg-gray-50 dark:bg-gray-800">
                         <button @click="showDeclineModal = false"
-                            class="flex-1 py-2 border rounded-xl text-sm font-bold">Cancel</button>
+                            class="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-black uppercase text-gray-600">Cancel</button>
                         <button @click="confirmDecline" :disabled="isLoading || !declineReason.trim()"
-                            class="flex-1 py-2 bg-red-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+                            class="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-red-200">
                             <Ban class="w-4 h-4" /> {{ isLoading ? 'Processing...' : 'Confirm Decline' }}
                         </button>
                     </div>

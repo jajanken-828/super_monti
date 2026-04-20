@@ -1,7 +1,7 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Iron, Clock, AlertTriangle } from 'lucide-vue-next';
+import { Shirt, Clock, AlertTriangle } from 'lucide-vue-next';
 
 const props = defineProps({
     stats: Object,
@@ -11,7 +11,6 @@ const props = defineProps({
 
 <template>
     <AuthenticatedLayout>
-
         <Head title="Dyeing Ironing Dashboard" />
         <div class="p-6 max-w-7xl mx-auto">
             <div class="flex justify-between items-center mb-6">
@@ -36,7 +35,7 @@ const props = defineProps({
                             <p class="text-sm text-gray-500 dark:text-gray-400">Pending Ironing</p>
                             <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ stats.pending }}</p>
                         </div>
-                        <Iron class="w-8 h-8 text-indigo-500" />
+                        <Shirt class="w-8 h-8 text-indigo-500" />
                     </div>
                 </div>
                 <div

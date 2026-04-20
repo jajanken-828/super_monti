@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Iron, AlertCircle, X } from 'lucide-vue-next';
+import { Shirt, AlertCircle, X } from 'lucide-vue-next';
 
 const props = defineProps({
     squeezerJobs: Array,
@@ -80,7 +80,7 @@ const submitIron = () => {
                         <div class="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-800">
                             <button @click="openIronModal(job)"
                                 class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2">
-                                <Iron class="w-4 h-4" /> Iron Fabric
+                                <Shirt class="w-4 h-4" /> Iron Fabric
                             </button>
                         </div>
                     </div>

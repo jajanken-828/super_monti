@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'module.access' => \App\Http\Middleware\CheckModuleAccess::class,
             'can.access.man.manager' => \App\Http\Middleware\CheckManufacturingManagerAccess::class,
             'page.permission' => \App\Http\Middleware\CheckPagePermission::class,
+            'man.role' => \App\Http\Middleware\CheckManufacturingRoleAccess::class,
         ]);
 
         /**

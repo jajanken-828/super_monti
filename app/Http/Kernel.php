@@ -39,5 +39,6 @@ class Kernel extends HttpKernel
         'module.access' => \App\Http\Middleware\CheckModuleAccess::class,
         'can.access.man.manager' => \App\Http\Middleware\CheckManufacturingManagerAccess::class, // NEW
         'page.permission' => \App\Http\Middleware\CheckPagePermission::class,
+        'man.role' => \App\Http\Middleware\CheckManufacturingRoleAccess::class,
     ];
 }

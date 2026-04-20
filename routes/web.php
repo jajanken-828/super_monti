@@ -110,6 +110,7 @@ use App\Http\Controllers\ceo\GeolocationController;
 | Core Application Routes
 |--------------------------------------------------------------------------
 */
+
 Route::get('/', function () {
     return inertia('Welcome', [
         'canLogin' => Route::has('login'),
@@ -298,7 +299,7 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
 
     // Analytics (page: analytics)
     Route::get('/analytics', [AnalyticsController::class, 'index'])
-        ->middleware('page.permission:analytics,view')
+        ->middleware(['page.permission:analytics,view', 'geofence'])
         ->name('analytics');
 
     // Positions (no page permission needed, used internally)
@@ -353,7 +354,7 @@ Route::prefix('dashboard/workforce')->name('workforce.')->middleware(['auth', 'v
 | Supply Chain Management (SCM) Routes
 |--------------------------------------------------------------------------
 */
-Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified', 'module.access:SCM'])->group(function () {
+Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified', 'module.access:SCM', 'geofence'])->group(function () {
     // Sales Orders (from ECO)
     Route::get('/sales-orders', [ScmSalesOrderController::class, 'index'])->name('sales-orders');
     Route::post('/sales-orders/{order}/check-inventory', [ScmSalesOrderController::class, 'checkInventory'])->name('sales-order.check-inventory');
@@ -361,7 +362,7 @@ Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified', 'm
     Route::post('/sales-orders/sales/{salesOrder}/check-inventory', [ScmSalesOrderController::class, 'checkInventorySalesOrder'])->name('sales-order.check-inventory-sales');
     Route::post('/sales-orders/sales/{salesOrder}/push-to-production', [ScmSalesOrderController::class, 'pushToProductionSalesOrder'])->name('sales-order.push-to-production-sales');
     Route::get('/sales-orders/check-inventory-instant/{type}/{id}', [ScmSalesOrderController::class, 'checkInventoryInstant'])
-    ->name('sales-order.check-inventory-instant');
+        ->name('sales-order.check-inventory-instant');
 
     // Procurement Orders (requests from Inventory)
     Route::get('/procurement-orders', [ScmProcurementOrderController::class, 'index'])->name('procurement-orders');
@@ -382,18 +383,18 @@ Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified', 'm
 | Financial Operations (FIN) Routes
 |--------------------------------------------------------------------------
 */
-Route::prefix('dashboard/fin')->name('fin.')->middleware(['auth', 'verified'])->group(function () {
+Route::prefix('dashboard/fin')->name('fin.')->middleware(['auth', 'verified', 'geofence'])->group(function () {
     Route::get('/interview', [InterviewController::class, 'index'])->name('interview.index');
     Route::get('/trainee', [TraineeController::class, 'index'])->name('trainee.index');
     Route::get('/access', [AccessController::class, 'index'])->name('access.index');
     Route::post('/access/update', [AccessController::class, 'update'])->name('access.update');
 
     Route::get('/manager', [FinDashboardController::class, 'managerDashboard'])
-        ->middleware(['module.access:FIN', 'position:manager'])
+        ->middleware(['module.access:FIN', 'position:manager', 'geofence'])
         ->name('manager.dashboard');
 
     Route::get('/staff', [FinDashboardController::class, 'staffDashboard'])
-        ->middleware(['module.access:FIN', 'position:staff'])
+        ->middleware(['module.access:FIN', 'position:staff', 'geofence'])
         ->name('employee.dashboard');
 });
 
@@ -402,14 +403,14 @@ Route::prefix('dashboard/fin')->name('fin.')->middleware(['auth', 'verified'])->
 | Manufacturing Plant (MAN) Routes
 |--------------------------------------------------------------------------
 */
-Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'module.access:MAN'])->group(function () {
+Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'module.access:MAN', 'geofence'])->group(function () {
     Route::get('/interview', [InterviewController::class, 'index'])->name('interview.index');
     Route::get('/trainee', [TraineeController::class, 'index'])->name('trainee.index');
     Route::get('/access', [AccessController::class, 'index'])->name('access.index');
 
     // Manager access control (supervisor management)
     // Accessible by manufacturing managers (position=manager) AND elevated secretaries/GMs with MAN module
-    Route::middleware(['can.access.man.manager'])->group(function () {
+    Route::middleware(['can.access.man.manager', 'geofence'])->group(function () {
         Route::get('/access/manage', [ManAccessController::class, 'index'])->name('access.manage');
         Route::post('/access/assign-supervisor', [ManAccessController::class, 'assignSupervisor'])->name('access.assign-supervisor');
         // Note: updateSupervisorRoles method is removed; no route needed.
@@ -417,22 +418,44 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
 
     // Staff dashboard entry point (redirects to role-specific dashboard or supervisor manager dashboard)
     Route::get('/staff', [ManDashboardController::class, 'staffDashboard'])
-        ->middleware(['module.access:MAN', 'position:staff'])
+        ->middleware(['module.access:MAN', 'position:staff', 'geofence'])
         ->name('employee.dashboard');
 
     // Manufacturing Manager Dashboard & Functions
     // Accessible by both 'manager' position users, manufacturing supervisors, AND elevated secretaries/GMs with MAN module
-    Route::middleware(['can.access.man.manager'])->group(function () {
+    Route::middleware(['can.access.man.manager', 'geofence'])->group(function () {
         Route::get('/', [ManufacturingManagerController::class, 'index'])->name('manager.dashboard');
         Route::get('/production', [ManufacturingManagerController::class, 'production'])->name('manager.production');
         Route::get('/rejected', [ManufacturingManagerController::class, 'rejected'])->name('manager.rejected');
         Route::post('/orders/{id}/forward-to-checker', [ManufacturingManagerController::class, 'forwardToChecker'])->name('manager.forward-to-checker');
         Route::post('/staff/{id}/update-role', [ManufacturingManagerController::class, 'updateStaffRole'])->name('manager.update-staff-role');
         Route::post('/packages/{id}/send-to-logistics', [ManufacturingManagerController::class, 'sendToLogistics'])->name('manager.send-to-logistics');
+
+        // Quality Checker — moved from staff level to manager level.
+        // Accessible by: MAN manager, manufacturing supervisors, CEO, secretary, GM.
+        Route::prefix('checker-quality')->name('manager.checker-quality.')->controller(CheckerQualityController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('dashboard');
+                Route::get('/production', 'production')->name('production');
+                Route::post('/order/{id}/check-inventory', 'checkInventory')->name('check-inventory');
+                Route::post('/order/{id}/start-production', 'startProduction')->name('start-production');
+                Route::post('/fabric/{id}/pass', 'passFabric')->name('pass-fabric');
+                Route::post('/dye/{id}/pass', 'passDye')->name('pass-dye');
+                Route::post('/softener/{id}/pass', 'passSoftener')->name('pass-softener');
+                Route::post('/squeezer/{id}/pass', 'passSqueezer')->name('pass-squeezer');
+                Route::post('/iron/{id}/pass', 'passIron')->name('pass-iron');
+                Route::post('/form/{id}/pack', 'packForm')->name('pack-form');
+                Route::post('/form/{id}/reject', 'rejectForm')->name('reject-form');
+                Route::post('/package/{id}/assign-to-order', 'assignPackageToOrder')->name('assign-package');
+            });
     });
 
-    // Staff-specific routes (each role has its own sub-dashboard)
-    Route::middleware(['module.access:MAN', 'position:staff'])->group(function () {
+    // Staff-specific routes (each role has its own sub-dashboard).
+    // Note: 'position:staff' is intentionally NOT here — manufacturing supervisors
+    // also have position='staff' in the DB but must be able to access all pages
+    // under their assigned department. The man.role middleware handles the
+    // granular access check for both staff and supervisors.
+    Route::middleware(['module.access:MAN'])->group(function () {
         Route::prefix('knitting-yarn')->name('staff.knitting-yarn.')->controller(KnittingYarnController::class)
             ->middleware('man.role:knitting_yarn')
             ->group(function () {
@@ -513,7 +536,7 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
             });
 
         Route::prefix('checker-quality')->name('staff.checker-quality.')->controller(CheckerQualityController::class)
-            ->middleware('man.role:checker_quality')
+            ->middleware(['man.role:checker_quality', 'geofence'])
             ->group(function () {
                 Route::get('/', 'index')->name('dashboard');
                 Route::get('/production', 'production')->name('production');
@@ -536,25 +559,34 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
 | Warehouse Module
 |--------------------------------------------------------------------------
 */
-Route::prefix('dashboard/warehouse')->name('warehouse.')->middleware(['auth', 'verified', 'module.access:WAR'])->group(function () {
+Route::prefix('dashboard/warehouse')->name('warehouse.')->middleware(['auth', 'verified', 'module.access:WAR', 'geofence'])->group(function () {
+    // General Warehouse Management
     Route::get('/', [WarehouseController::class, 'index'])->name('index');
     Route::post('/', [WarehouseController::class, 'store'])->name('store');
     Route::put('/{warehouse}', [WarehouseController::class, 'update'])->name('update');
     Route::delete('/{warehouse}', [WarehouseController::class, 'destroy'])->name('destroy');
 
+    // Receiving & Logistics
     Route::get('/receiving', [ReceivingController::class, 'index'])->name('receiving');
     Route::post('/receiving', [ReceivingController::class, 'receive'])->name('receiving.store');
 
+    // Warehouse Monitor (The Grid)
     Route::get('/monitor/{warehouse}', [MonitorController::class, 'show'])->name('monitor');
     Route::post('/monitor/layout/{warehouse}', [MonitorController::class, 'updateLayout'])->name('monitor.layout');
+
+    // DRAG & DROP ROUTE (Fixed naming)
     Route::post('/monitor/assign', [MonitorController::class, 'assignToShelf'])->name('monitor.assign');
+
     Route::post('/monitor/use/{stockItem}', [MonitorController::class, 'useMaterial'])->name('monitor.use');
 
+    // Packaging & Logistics
     Route::get('/packages', [PackageController::class, 'index'])->name('packages');
     Route::post('/packages/{package}/push', [PackageController::class, 'pushToLogistics'])->name('packages.push');
 
+    // Rejects
     Route::get('/rejects', [RejectController::class, 'index'])->name('rejects');
 
+    // Access Control
     Route::get('/access', [WarehouseAccessController::class, 'index'])->name('access');
     Route::post('/access/update', [WarehouseAccessController::class, 'update'])->name('access.update');
 });
@@ -564,7 +596,7 @@ Route::prefix('dashboard/warehouse')->name('warehouse.')->middleware(['auth', 'v
 | Inventory Module
 |--------------------------------------------------------------------------
 */
-Route::prefix('dashboard/inventory')->name('inv.')->middleware(['auth', 'verified', 'module.access:INV'])->group(function () {
+Route::prefix('dashboard/inventory')->name('inv.')->middleware(['auth', 'verified', 'module.access:INV', 'geofence'])->group(function () {
     Route::get('/', [InvDashboardController::class, 'managerDashboard'])->name('dashboard');
     Route::get('/materials', [MaterialController::class, 'material'])->name('materials');
     Route::post('/materials', [MaterialController::class, 'store'])->name('materials.store');
@@ -593,6 +625,9 @@ Route::prefix('dashboard/inventory')->name('inv.')->middleware(['auth', 'verifie
     Route::post('/product/{id}/update', [ProductController::class, 'update'])->name('manager.product.update');
     Route::delete('/product/image/{imageId}', [ProductController::class, 'destroyImage'])->name('manager.product.image.destroy');
     Route::delete('/product/{id}', [ProductController::class, 'destroy'])->name('manager.product.destroy');
+
+    // Edit view for material
+    Route::patch('/materials/{material}', [MaterialController::class, 'update'])->name('materials.update');
 });
 
 /*
@@ -815,13 +850,13 @@ Route::prefix('dashboard/eco')->name('eco.')->middleware(['auth', 'verified', 'm
     Route::post('/inquiries/{inquiry}/meeting', [EcoInquiryController::class, 'setMeeting'])->name('inquiry.meeting');
     Route::post('/inquiries/{inquiry}/quotation', [EcoInquiryController::class, 'issueQuotation'])->name('inquiry.quotation');
     Route::get('/clients/{client}/credit-check', [EcoInquiryController::class, 'creditCheck'])->name('credit.check');
-    
+
     // NEW: Attachment actions for ECO
     Route::post('/attachment/{attachment}/create-recipe', [EcoInquiryController::class, 'createRecipeFromAttachment'])
         ->name('attachment.create-recipe');
     Route::post('/attachment/{attachment}/create-job-order', [EcoInquiryController::class, 'createJobOrderFromPO'])
         ->name('attachment.create-job-order');
-    
+
     // Credit ledger
     Route::get('/credit', [EcoCreditController::class, 'index'])->name('credit');
     Route::post('/credit/approve/{order}', [EcoCreditController::class, 'approveCreditReview'])->name('credit.approve');
@@ -931,8 +966,10 @@ Route::prefix('dashboard/ceo')->name('ceo.')->middleware(['auth', 'verified', 'r
     Route::post('/access/update-profile-photo', [CeoAccessController::class, 'updateProfilePhoto'])->name('access.updateProfilePhoto');
     Route::get('/access/client-assignments/{staffId}', [CeoAccessController::class, 'getClientAssignments'])->name('access.clientAssignments');
     Route::post('/access/assign-clients', [CeoAccessController::class, 'updateClientAssignments'])->name('access.updateClientAssignments');
+
+    // Geolocation Page View (GET)
     Route::get('/location', [GeolocationController::class, 'index'])->name('location.index');
-    
+
     // Geolocation Data Sync (POST)
     Route::post('/user/location/sync', [GeolocationController::class, 'store'])->name('location.store');
 });
@@ -972,14 +1009,14 @@ Route::middleware('auth:client')->prefix('partner')->name('client.')->group(func
     Route::post('/quotations/{quotation}/accept', [ClientConversationController::class, 'acceptQuotation'])->name('client.quotation.accept');
     Route::post('/quotations/{quotation}/reject', [ClientConversationController::class, 'rejectQuotation'])->name('client.quotation.reject');
     Route::get('quotations/{quotation}/download', [ClientConversationController::class, 'downloadQuotation'])
-    ->name('client.quotation.download');
+        ->name('client.quotation.download');
     // CORRECTED: send-po route name
     Route::post('/conversation/{inquiry}/send-po', [ClientConversationController::class, 'sendPO'])->name('conversation.send-po');
-    
+
     // NEW: Attachment approval by client
     Route::post('/conversation/attachment/{attachment}/approve', [ClientConversationController::class, 'approveAttachment'])
         ->name('conversation.attachment.approve');
-    
+
     // Orders & Invoices (legacy support)
     Route::get('/orders', [OrdersController::class, 'orders'])->name('orders');
     Route::post('/orders/{order}/accept', [OrdersController::class, 'acceptPurchaseOrder'])->name('orders.accept');

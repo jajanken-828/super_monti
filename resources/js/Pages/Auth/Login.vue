@@ -4,15 +4,17 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { toast } from 'vue3-toastify';
 import 'vue3-toastify/dist/index.css';
+import Swal from 'sweetalert2';
 
 defineProps<{
     canResetPassword?: boolean;
     status?: string;
 }>();
 
+const page = usePage();
 const isLoaded = ref(false);
 const showPassword = ref(false);
 
@@ -24,6 +26,28 @@ let warningTimeout: ReturnType<typeof setTimeout>;
 onMounted(() => {
     isLoaded.value = true;
 });
+
+/**
+ * WATCH FOR GEOFENCE SECURITY ERRORS
+ * Triggered when the middleware bounces a user back to login
+ */
+watch(() => (page.props.flash as any)?.geofence_error, (message) => {
+    if (message) {
+        Swal.fire({
+            title: 'Security Perimeter Block',
+            text: message,
+            icon: 'error',
+            confirmButtonColor: '#2563eb',
+            background: '#fff',
+            backdrop: `rgba(15, 23, 42, 0.9)`,
+            allowOutsideClick: false,
+            customClass: {
+                popup: 'rounded-[2rem] border-4 border-red-50/10 shadow-2xl',
+                title: 'font-black uppercase tracking-tight text-slate-900',
+            }
+        });
+    }
+}, { immediate: true });
 
 const form = useForm({
     identity: '',
@@ -45,7 +69,6 @@ const triggerWarning = (msg: string) => {
 
 // --- STRICT REAL-TIME VALIDATIONS ---
 const blockInvalidChars = (e: KeyboardEvent) => {
-    // Block spaces and common invalid characters for email/EMP ID
     if (e.key === ' ' || /[^a-zA-Z0-9@.\-_]/.test(e.key)) {
         e.preventDefault();
         triggerWarning('Spaces and special characters are not allowed.');
@@ -55,7 +78,6 @@ const blockInvalidChars = (e: KeyboardEvent) => {
 watch(() => form.identity, (val) => {
     let filtered = val.replace(/[^a-zA-Z0-9@.\-_]/g, '');
 
-    // Auto capitalize if they are typing an Employee ID
     if (filtered.toLowerCase().startsWith('monti')) {
         filtered = filtered.toUpperCase();
     }
@@ -88,7 +110,6 @@ const submit = () => {
             return;
         }
     } else {
-        // Basic EMP ID check
         if (!form.identity.startsWith('MONTI')) {
             toast.error('Employee ID must start with MONTI (e.g. MONTI-1234-5).');
             triggerWarning('Must start with MONTI.');

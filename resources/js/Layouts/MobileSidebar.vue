@@ -35,6 +35,20 @@ const isManOpen = ref(false)
 const isOrdOpen = ref(false)
 const isLogisticsOpen = ref(false)
 
+// For dynamically created role dropdowns inside MAN
+const roleDropdownStates = ref({})
+
+const toggleRoleDropdown = (roleKey) => {
+    roleDropdownStates.value[roleKey] = !roleDropdownStates.value[roleKey]
+}
+
+const getRoleDropdownState = (roleKey, defaultState = false) => {
+    if (roleDropdownStates.value[roleKey] === undefined) {
+        roleDropdownStates.value[roleKey] = defaultState
+    }
+    return roleDropdownStates.value[roleKey]
+}
+
 const toggleWorkforceSub = () => { isWorkforceSubOpen.value = !isWorkforceSubOpen.value }
 const toggleHrm = () => { isHrmOpen.value = !isHrmOpen.value }
 const toggleCrm = () => { isCrmOpen.value = !isCrmOpen.value }
@@ -79,6 +93,9 @@ const canAccessModule = (moduleName) => {
     if (user.value?.is_manufacturing_supervisor) {
         if (moduleName === 'MAN') return true
         return grantedModules.value.includes(moduleName)
+    }
+    if (moduleName === 'MAN' && user.value?.manufacturing_role) {
+        return true
     }
     return user.value?.role === moduleName
 }
@@ -177,22 +194,49 @@ const switchManufacturingRole = (role) => {
 }
 const formatRoleLabel = (role) => role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 
+// Helper to generate three links for a role (as an array of link objects)
+const getRoleLinks = (roleWithUnderscores, label, icon, hasReports = true) => {
+    const roleWithHyphens = roleWithUnderscores.replace(/_/g, '-')
+    const routePrefix = `man.staff.${roleWithHyphens}`
+    const links = [
+        { label: 'Dashboard', href: route(`${routePrefix}.dashboard`), icon: LayoutDashboard },
+        { label: label, href: route(`${routePrefix}.page`), icon: icon }
+    ]
+    if (hasReports) {
+        links.push({ label: 'Reports', href: route(`${routePrefix}.reports`), icon: FileText })
+    }
+    return links
+}
+
+// Helper to create a dropdown item for a role (used inside MAN module)
+const createRoleDropdown = (roleKey, roleLabel, roleIcon, hasReports = true) => {
+    const isOpen = getRoleDropdownState(roleKey, false)
+    return {
+        label: roleLabel,
+        icon: roleIcon,
+        isDropdown: true,
+        isOpen: isOpen,
+        toggle: () => toggleRoleDropdown(roleKey),
+        children: getRoleLinks(roleKey, roleLabel, roleIcon, hasReports)
+    }
+}
+
+// Department staff roles for supervisor view (returns array of dropdown items)
 const departmentStaffRoles = computed(() => {
     const dept = supervisedDepartment.value
     if (dept === 'knitting') {
-        return [{ role: 'knitting_yarn', label: 'Knitting Yarn', route: 'man.staff.knitting-yarn.dashboard', icon: Sparkles }]
+        return [createRoleDropdown('knitting_yarn', 'Knitting Yarn', Sparkles, true)]
     } else if (dept === 'dyeing') {
         return [
-            { role: 'dyeing_color', label: 'Dyeing Color', route: 'man.staff.dyeing-color.dashboard', icon: Palette },
-            { role: 'dyeing_fabric_softener', label: 'Dyeing Fabric Softener', route: 'man.staff.dyeing-fabric-softener.dashboard', icon: Palette },
-            { role: 'dyeing_squeezer', label: 'Dyeing Squeezer', route: 'man.staff.dyeing-squeezer.dashboard', icon: Palette },
-            { role: 'dyeing_ironing', label: 'Dyeing Ironing', route: 'man.staff.dyeing-ironing.dashboard', icon: Palette },
-            { role: 'dyeing_forming', label: 'Dyeing Forming', route: 'man.staff.dyeing-forming.dashboard', icon: Palette },
-            { role: 'dyeing_packaging', label: 'Dyeing Packaging', route: 'man.staff.dyeing-packaging.dashboard', icon: Palette },
-            { role: 'checker_quality', label: 'Checker Quality', route: 'man.staff.checker-quality.dashboard', icon: CheckCircle2 }
+            createRoleDropdown('dyeing_color', 'Dyeing Color', Palette, true),
+            createRoleDropdown('dyeing_fabric_softener', 'Dyeing Fabric Softener', Palette, true),
+            createRoleDropdown('dyeing_squeezer', 'Dyeing Squeezer', Palette, true),
+            createRoleDropdown('dyeing_ironing', 'Dyeing Ironing', Palette, true),
+            createRoleDropdown('dyeing_forming', 'Dyeing Forming', Palette, true),
+            createRoleDropdown('dyeing_packaging', 'Dyeing Packaging', Palette, false)
         ]
     } else if (dept === 'maintenance') {
-        return [{ role: 'maintenance_checker', label: 'Maintenance Checker', route: 'man.staff.maintenance-checker.dashboard', icon: Wrench }]
+        return [createRoleDropdown('maintenance_checker', 'Maintenance Checker', Wrench, true)]
     }
     return []
 })
@@ -255,6 +299,7 @@ const getFilteredManChildren = () => {
         { label: 'Dashboard', href: route('man.manager.dashboard'), icon: Factory },
         { label: 'Production Orders', href: route('man.manager.production'), icon: ClipboardList },
         { label: 'Rejected Items', href: route('man.manager.rejected'), icon: XCircle },
+        { label: 'Quality Checker', href: route('man.manager.checker-quality.dashboard'), icon: CheckCircle2 },
         { label: 'Interviews', href: route('man.interview.index'), icon: Eye },
         { label: 'Trainees', href: route('man.trainee.index'), icon: Award },
     ]
@@ -265,18 +310,29 @@ const getFilteredManChildren = () => {
     let children = []
     if (user.value?.role === 'CEO' || (user.value?.position === 'manager' && user.value?.role === 'MAN') || (user.value?.position === 'secretary' || user.value?.position === 'general_manager') || isManufacturingSupervisor.value) {
         children = [...managerChildren]
+        if (isManufacturingSupervisor.value && supervisedDepartment.value) {
+            const staffDropdowns = departmentStaffRoles.value
+            if (staffDropdowns.length) {
+                children.push({ isDivider: true, label: '── Department Staff ──' })
+                children.push(...staffDropdowns)
+            }
+        }
     } else {
-        const perms = user.value?.permissions?.MAN
-        if (perms) children = managerChildren.filter(child => perms.includes(child.label.toLowerCase()))
-    }
-    if (isManufacturingSupervisor.value && supervisedDepartment.value) {
-        const staffLinks = departmentStaffRoles.value.map(role => ({
-            label: role.label,
-            href: route(role.route),
-            icon: role.icon,
-        }))
-        children.push({ isDivider: true, label: '── Department Staff ──' })
-        children.push(...staffLinks)
+        const manufacturingRole = user.value?.manufacturing_role
+        const staffRoleConfig = {
+            knitting_yarn:          { label: 'Knitting Yarn',          icon: Sparkles, hasReports: true },
+            dyeing_color:           { label: 'Dyeing Color',           icon: Palette,  hasReports: true },
+            dyeing_fabric_softener: { label: 'Dyeing Fabric Softener', icon: Palette,  hasReports: true },
+            dyeing_squeezer:        { label: 'Dyeing Squeezer',        icon: Palette,  hasReports: true },
+            dyeing_ironing:         { label: 'Dyeing Ironing',         icon: Palette,  hasReports: true },
+            dyeing_forming:         { label: 'Dyeing Forming',         icon: Palette,  hasReports: true },
+            dyeing_packaging:       { label: 'Dyeing Packaging',       icon: Palette,  hasReports: false },
+            maintenance_checker:    { label: 'Maintenance Checker',    icon: Wrench,   hasReports: true },
+        }
+        const config = staffRoleConfig[manufacturingRole]
+        if (config) {
+            children = [createRoleDropdown(manufacturingRole, config.label, config.icon, config.hasReports)]
+        }
     }
     return children
 }
@@ -438,7 +494,6 @@ const navItems = computed(() => {
         items.push({ label: 'Organization Chart', href: route('ceo.access'), icon: ShieldCheck })
     }
 
-    // Driver / Conductor portals
     if (userRole === 'LOG' && userPosition === 'staff') {
         if (isDriver.value) {
             items.push({ label: 'My Deliveries', href: route('logistics.driver.portal'), icon: Truck })
@@ -457,7 +512,6 @@ const navItems = computed(() => {
         return items
     }
 
-    // Define all modules
     const modules = [
         { key: 'HRM', label: 'Human Resource', icon: Users, childrenGetter: getFilteredHrmChildren, isOpen: isHrmOpen, toggle: toggleHrm, condition: canAccessModule('HRM') },
         { key: 'CRM', label: 'Customer Relationship', icon: UserPen, childrenGetter: getFilteredCrmChildren, isOpen: isCrmOpen, toggle: toggleCrm, condition: canAccessModule('CRM') },
@@ -493,7 +547,6 @@ const navItems = computed(() => {
         }
     }
 
-    // Workforce module
     const workforceChildren = getFilteredWorkforceChildren()
     if (canAccessWorkforce() && workforceChildren.length) {
         featureModules.push({
@@ -560,7 +613,6 @@ const logoutRoute = computed(() => {
 
 <template>
     <div class="md:hidden">
-        <!-- Mobile Header -->
         <nav
             class="fixed top-0 left-0 right-0 z-[60] bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm h-16 flex items-center justify-between px-4 transition-colors duration-300">
             <div class="flex items-center gap-3">
@@ -585,13 +637,11 @@ const logoutRoute = computed(() => {
             </button>
         </nav>
 
-        <!-- Backdrop (shown when sidebar is open) -->
         <div v-show="isOpen"
             class="fixed inset-0 z-[50] bg-black/40 backdrop-blur-sm transition-opacity duration-300"
             @click="isOpen = false"
             aria-hidden="true"></div>
 
-        <!-- Sliding Sidebar -->
         <div v-show="isOpen"
             :class="[
                 'fixed inset-y-0 left-0 z-[55] w-[80vw] max-w-sm bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl flex flex-col shadow-2xl h-full pt-16 border-r border-gray-200/50 dark:border-gray-800/50 transition-transform duration-300 ease-out',
@@ -608,7 +658,7 @@ const logoutRoute = computed(() => {
                             <p class="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em]">{{ item.label }}</p>
                         </div>
 
-                        <!-- Dropdown Module -->
+                        <!-- Dropdown (level 1) -->
                         <div v-else-if="item.isDropdown" class="space-y-1">
                             <button @click="item.toggle" :class="[
                                 item.isOpen ? 'text-blue-600 bg-white/50 dark:bg-gray-900/50' : 'text-gray-500 dark:text-gray-400',
@@ -625,12 +675,41 @@ const logoutRoute = computed(() => {
                                     :class="['h-4 w-4 transition-transform duration-300', item.isOpen ? 'rotate-90' : 'text-gray-400']" />
                             </button>
 
-                            <div v-show="item.isOpen" class="pl-12 space-y-1 mt-1 transition-all">
+                            <!-- Children (may contain further dropdowns or links) -->
+                            <div v-show="item.isOpen" class="pl-6 space-y-1 mt-1 transition-all">
                                 <template v-for="subItem in item.children" :key="subItem.label">
-                                    <div v-if="subItem.isDivider" class="text-[10px] text-gray-400 py-1 px-2">{{ subItem.label }}</div>
-                                    <Link v-else :href="subItem.href" @click="handleNavClick" :class="[
-                                        isActive(subItem.href) ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-                                    ]" class="flex items-center py-2.5 text-[13px] font-bold transition-colors">
+                                    <!-- Sub-dropdown (level 2) -->
+                                    <div v-if="subItem.isDropdown" class="space-y-1">
+                                        <button @click="subItem.toggle" :class="[
+                                            subItem.isOpen ? 'text-blue-600 bg-white/50 dark:bg-gray-900/50' : 'text-gray-500 dark:text-gray-400',
+                                            'w-full flex items-center justify-between px-3 py-3 text-[13px] font-bold rounded-xl hover:bg-white/50 dark:hover:bg-gray-900/50 transition-all duration-300'
+                                        ]">
+                                            <div class="flex items-center">
+                                                <div :class="[subItem.isOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400']"
+                                                    class="p-1.5 rounded-lg mr-2 transition-colors duration-300">
+                                                    <component :is="subItem.icon" class="h-4 w-4" />
+                                                </div>
+                                                <span class="truncate tracking-tight">{{ subItem.label }}</span>
+                                            </div>
+                                            <ChevronRight
+                                                :class="['h-3.5 w-3.5 transition-transform duration-300', subItem.isOpen ? 'rotate-90' : 'text-gray-400']" />
+                                        </button>
+                                        <div v-show="subItem.isOpen" class="pl-8 space-y-1">
+                                            <Link v-for="link in subItem.children" :key="link.label"
+                                                :href="link.href" @click="handleNavClick"
+                                                :class="[isActive(link.href) ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white']"
+                                                class="flex items-center py-2 text-[12px] font-medium transition-colors">
+                                                <component :is="link.icon" class="h-3.5 w-3.5 mr-2" />
+                                                {{ link.label }}
+                                            </Link>
+                                        </div>
+                                    </div>
+                                    <!-- Divider -->
+                                    <div v-else-if="subItem.isDivider" class="text-[10px] text-gray-400 py-1 px-2">{{ subItem.label }}</div>
+                                    <!-- Direct link (level 2) -->
+                                    <Link v-else :href="subItem.href" @click="handleNavClick"
+                                        :class="[isActive(subItem.href) ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white']"
+                                        class="flex items-center py-2.5 text-[13px] font-bold transition-colors">
                                         <component :is="subItem.icon" class="h-4 w-4 mr-3" />
                                         {{ subItem.label }}
                                     </Link>
@@ -638,7 +717,7 @@ const logoutRoute = computed(() => {
                             </div>
                         </div>
 
-                        <!-- Direct Link -->
+                        <!-- Direct link -->
                         <Link v-else :href="item.href" @click="handleNavClick" :class="[
                             isActive(item.href)
                                 ? isSupplier
@@ -665,7 +744,6 @@ const logoutRoute = computed(() => {
                 </nav>
             </div>
 
-            <!-- User Profile Section -->
             <div class="p-4 mt-auto border-t border-gray-100 dark:border-gray-800">
                 <div
                     class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md rounded-2xl p-3 border border-gray-100/50 dark:border-gray-800/50 shadow-lg">
@@ -710,7 +788,6 @@ const logoutRoute = computed(() => {
                         </button>
                     </div>
 
-                    <!-- Manufacturing Supervisor Role Switcher -->
                     <div v-if="isManufacturingSupervisor && supervisorRoles.length > 0"
                         class="mt-3 pt-3 border-t border-gray-200/50 dark:border-gray-700/50">
                         <p class="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
@@ -735,7 +812,6 @@ const logoutRoute = computed(() => {
             </div>
         </div>
 
-        <!-- Logout Modal -->
         <Teleport to="body">
             <transition name="modal-fade">
                 <div v-if="showLogoutModal"

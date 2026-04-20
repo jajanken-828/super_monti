@@ -84,16 +84,16 @@ class ManufacturingManagerController extends Controller
             ->get()
             ->map(function ($order) {
                 $items = $order->items->map(fn($item) => [
-                    'product_name' => $item->product->name,
-                    'product_sku'  => $item->product->sku,
+                    'product_name' => $item->product->name ?? 'Unknown',
+                    'product_sku'  => $item->product->sku ?? '',
                     'quantity'     => $item->quantity,
                 ]);
                 return [
                     'type'          => 'purchase_order',
                     'id'            => $order->id,
                     'order_number'  => $order->po_number,
-                    'client_name'   => $order->client->company_name,
-                    'total_quantity'=> $order->items->sum('quantity'),
+                    'client_name'   => $order->client->company_name ?? 'N/A',
+                    'total_quantity' => $order->items->sum('quantity'),
                     'items'         => $items,
                     'created_at'    => $order->created_at,
                 ];
@@ -106,19 +106,25 @@ class ManufacturingManagerController extends Controller
             ->map(function ($order) {
                 // Build item representation
                 $items = [];
-                if ($order->color || $order->yarn_type) {
-                    $productName = trim(($order->color ?? '') . ' ' . ($order->yarn_type ?? ''));
+                $productName = trim(($order->color ?? '') . ' ' . ($order->yarn_type ?? ''));
+                if (!empty($productName)) {
                     $items[] = [
-                        'product_name' => $productName ?: 'Custom Product',
+                        'product_name' => $productName,
+                        'quantity'     => $order->quantity ?? 0,
+                    ];
+                } else {
+                    $items[] = [
+                        'product_name' => 'Custom Product',
                         'quantity'     => $order->quantity ?? 0,
                     ];
                 }
+
                 return [
                     'type'          => 'sales_order',
                     'id'            => $order->id,
                     'order_number'  => $order->jo_number ?? 'JO-' . $order->id,
                     'client_name'   => $order->client->company_name ?? 'N/A',
-                    'total_quantity'=> $order->quantity ?? 0,
+                    'total_quantity' => $order->quantity ?? 0,
                     'items'         => $items,
                     'created_at'    => $order->created_at,
                 ];
@@ -170,7 +176,7 @@ class ManufacturingManagerController extends Controller
      */
     public function forwardToChecker(Request $request, $orderId)
     {
-        $type = $request->input('type', 'purchase_order'); // 'purchase_order' or 'sales_order'
+        $type = $request->input('type', 'purchase_order');
         $user = Auth::user();
 
         if ($type === 'purchase_order') {
@@ -185,23 +191,23 @@ class ManufacturingManagerController extends Controller
                 'notes'             => 'Forwarded to manufacturing by ' . $user->name,
             ]);
 
-            $order->queue()->update(['stage' => 'man_production']);
+            // Keep the queue stage as man_production (already set by SCM push)
+            // You may update it if needed; currently no change required.
 
         } elseif ($type === 'sales_order') {
             $order = SalesOrder::findOrFail($orderId);
             $totalQuantity = $order->quantity ?? 0;
 
-            // Create a ManufacturingOrder (you may need to link it to sales_order_id if you add that column)
+            // Create ManufacturingOrder record for the sales order
             ManufacturingOrder::create([
-                'sales_order_id'      => $order->id, // Ensure this column exists or adjust
-                'total_quantity'      => $totalQuantity,
-                'remaining_quantity'  => $totalQuantity,
-                'status'              => 'pending',
-                'notes'               => 'Forwarded to manufacturing by ' . $user->name,
+                'sales_order_id'     => $order->id,
+                'total_quantity'     => $totalQuantity,
+                'remaining_quantity' => $totalQuantity,
+                'status'             => 'pending',
+                'notes'              => 'Forwarded to manufacturing by ' . $user->name,
             ]);
 
-            // Update status to indicate it's in production (already 'in_production' from SCM push)
-            $order->update(['status' => 'in_production']);
+            // Status remains 'in_production' (already set by SCM push)
         } else {
             abort(400, 'Invalid order type.');
         }

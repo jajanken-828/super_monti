@@ -91,19 +91,20 @@ const checkInventoryInstant = async (order) => {
 
 // ── Proceed with actual inventory check (status update) after viewing result ─
 const proceedWithInventoryCheck = () => {
-    if (!currentCheckOrder.value) return;
+    if (!currentCheckOrder.value || !inventoryResult.value) return;
 
     const order = currentCheckOrder.value;
+    const sufficient = inventoryResult.value.sufficient;
     actionLoading.value[order.id] = 'check';
 
     const url = order.type === 'sales_order'
         ? route('scm.sales-order.check-inventory-sales', order.sales_order_id)
         : route('scm.sales-order.check-inventory', order.id);
 
-    router.post(url, {}, {
+    router.post(url, { sufficient }, {
         preserveScroll: true,
         onSuccess: () => {
-            showToast('Inventory check confirmed. Status updated.');
+            showToast(sufficient ? 'Inventory OK – ready for production.' : 'Inventory check recorded – insufficient stock.');
             showInventoryResultModal.value = false;
             inventoryResult.value = null;
             currentCheckOrder.value = null;

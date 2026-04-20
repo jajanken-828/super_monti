@@ -111,7 +111,6 @@ class MaterialController extends Controller
      */
     public function procurement(Request $request, $id)
     {
-        dd($request->all());    
         $material = Material::findOrFail($id);
 
         // Validating data sent from the Modal
@@ -136,6 +135,23 @@ class MaterialController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Procurement request sent to SCM.');
+    }
+
+    /**
+     * Update material details (Name and Reorder Point)
+     */
+    public function update(Request $request, $id)
+    {
+        $material = Material::findOrFail($id);
+
+        $validated = $request->validate([
+            'name'          => 'required|string|max:255',
+            'reorder_point' => 'required|numeric|min:0',
+        ]);
+
+        $material->update($validated);
+
+        return redirect()->back()->with('success', 'Material updated successfully.');
     }
 
     /**
