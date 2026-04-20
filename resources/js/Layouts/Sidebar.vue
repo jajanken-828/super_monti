@@ -326,6 +326,7 @@ const navItems = computed(() => {
     if (isCEO) {
         items.push({ label: 'CEO Dashboard', href: route('dashboard'), icon: LayoutDashboard })
         items.push({ label: 'Organization Chart', href: route('ceo.access'), icon: ShieldCheck })
+        items.push({ label: 'Goelocation', href: route('ceo.location.index'), icon: MapPin  })
     }
 
     // Driver / Conductor portals (LOG staff only)

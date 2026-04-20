@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use App\Models\inv\Material;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WarehouseReceiving extends Model
 {
@@ -26,26 +27,35 @@ class WarehouseReceiving extends Model
         'received_at' => 'datetime',
     ];
 
-    public function warehouse()
+    /**
+     * Get the warehouse where items were received.
+     */
+    public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
     }
 
-    public function purchaseOrder()
+    /**
+     * Get the Purchase Order associated with this receiving record.
+     * FIXED: Added Scm sub-namespace to prevent "Class not found" error.
+     */
+    public function purchaseOrder(): BelongsTo
     {
-        return $this->belongsTo(ScmPurchaseOrder::class, 'scm_purchase_order_id');
+        return $this->belongsTo(\App\Models\Scm\ScmPurchaseOrder::class, 'scm_purchase_order_id');
     }
 
-    public function receivedBy()
+    /**
+     * Get the user who processed the receiving.
+     */
+    public function receivedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
     }
 
     /**
-     * Items associated with this receiving.
-     * The foreign key is 'receiving_id' on the warehouse_receiving_items table.
+     * Items associated with this receiving transaction.
      */
-    public function items()
+    public function items(): HasMany
     {
         return $this->hasMany(WarehouseReceivingItem::class, 'receiving_id');
     }

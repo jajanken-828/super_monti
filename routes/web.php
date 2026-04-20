@@ -103,6 +103,7 @@ use App\Http\Controllers\workforce\LeaveController as WorkforceLeaveController;
 use App\Http\Controllers\workforce\SchedulerController;
 use App\Http\Controllers\workforce\WorkforceDashboardController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ceo\GeolocationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -930,6 +931,10 @@ Route::prefix('dashboard/ceo')->name('ceo.')->middleware(['auth', 'verified', 'r
     Route::post('/access/update-profile-photo', [CeoAccessController::class, 'updateProfilePhoto'])->name('access.updateProfilePhoto');
     Route::get('/access/client-assignments/{staffId}', [CeoAccessController::class, 'getClientAssignments'])->name('access.clientAssignments');
     Route::post('/access/assign-clients', [CeoAccessController::class, 'updateClientAssignments'])->name('access.updateClientAssignments');
+    Route::get('/location', [GeolocationController::class, 'index'])->name('location.index');
+    
+    // Geolocation Data Sync (POST)
+    Route::post('/user/location/sync', [GeolocationController::class, 'store'])->name('location.store');
 });
 
 /*

@@ -52,6 +52,8 @@ class CheckerController extends Controller
      */
     public function requestProcurement(Request $request, Material $material)
     {
+        // Now $request->all() will contain: ['required_qty' => ..., 'urgency' => ...]
+      
         $validated = $request->validate([
             'required_qty' => 'required|numeric|min:0.01',
             'urgency' => 'required|in:High,Medium,Low',
@@ -67,7 +69,7 @@ class CheckerController extends Controller
             'material_name' => $material->name,
             'category' => $material->category,
             'unit' => $material->unit,
-            'current_stock' => $currentStock,
+            'current_stock' => (float) $currentStock,
             'reorder_point' => $material->reorder_point,
             'required_qty' => $validated['required_qty'],
             'urgency' => $validated['urgency'],
@@ -77,7 +79,7 @@ class CheckerController extends Controller
             'status' => 'pending',
         ]);
 
-        return redirect()->back()->with('success', "Procurement request {$reqNumber} sent to SCM.");
+        return redirect()->back()->with('success', "Procurement request {$reqNumber} sent.");
     }
 
     /**

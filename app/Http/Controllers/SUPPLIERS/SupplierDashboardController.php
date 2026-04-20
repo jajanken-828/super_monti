@@ -116,6 +116,7 @@ class SupplierDashboardController extends Controller
      */
     public function updateOrderStatus(Request $request, $id)
     {
+    //    dd($request->all());
         $validated = $request->validate([
             'status' => 'required|in:production,shipping',
         ]);

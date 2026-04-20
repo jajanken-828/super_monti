@@ -89,7 +89,6 @@ const confirmDecline = () => {
 </script>
 
 <template>
-
     <Head title="PRO - Supplier Quotations" />
     <AuthenticatedLayout>
         <div class="mb-6">
@@ -147,7 +146,6 @@ const confirmDecline = () => {
             </div>
         </div>
 
-        <!-- RFQ Detail Modal -->
         <Teleport to="body">
             <div v-if="showDetailModal && selectedRFQ"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
@@ -231,7 +229,6 @@ const confirmDecline = () => {
             </div>
         </Teleport>
 
-        <!-- Accept Quotation Modal -->
         <Teleport to="body">
             <div v-if="showAcceptModal && acceptTarget"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
@@ -276,8 +273,8 @@ const confirmDecline = () => {
                                         <strong>{{ formatCurrency(acceptTarget.response.total_price) }}</strong>
                                     </div>
                                     <div class="flex justify-between mt-1">
-                                        <span class="font-black uppercase text-[10px] text-emerald-600">Tax (10%)</span>
-                                        <strong>{{ formatCurrency(acceptTarget.response.total_price * 0.1) }}</strong>
+                                        <span class="font-black uppercase text-[10px] text-emerald-600">VAT (12%)</span>
+                                        <strong>{{ formatCurrency(acceptTarget.response.total_price * 0.12) }}</strong>
                                     </div>
                                 </div>
                                 <div class="pt-3 mt-1 border-t-2 border-emerald-300 border-dashed">
@@ -286,7 +283,7 @@ const confirmDecline = () => {
                                             Total</span>
                                         <strong class="text-xl font-black">{{
                                             formatCurrency(acceptTarget.response.total_price *
-                                            1.1) }}</strong>
+                                            1.12) }}</strong>
                                     </div>
                                 </div>
                             </div>
@@ -307,7 +304,6 @@ const confirmDecline = () => {
             </div>
         </Teleport>
 
-        <!-- Decline Quotation Modal -->
         <Teleport to="body">
             <div v-if="showDeclineModal && declineTarget"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"

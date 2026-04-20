@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\inv\Material;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WarehouseReceivingItem extends Model
 {
@@ -22,13 +23,19 @@ class WarehouseReceivingItem extends Model
         'reject_reason',
     ];
 
-    public function receiving()
+    /**
+     * Get the parent receiving record.
+     */
+    public function receiving(): BelongsTo
     {
         return $this->belongsTo(WarehouseReceiving::class, 'receiving_id');
     }
 
-    public function material()
+    /**
+     * Get the material associated with this line item.
+     */
+    public function material(): BelongsTo
     {
-        return $this->belongsTo(Material::class);
+        return $this->belongsTo(Material::class, 'material_id');
     }
 }

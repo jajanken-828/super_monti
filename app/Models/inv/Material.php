@@ -25,6 +25,24 @@ class Material extends Model
     ];
 
     /**
+     * Relationship: Get all actual receiving logs for this material.
+     * This allows us to track which specific Warehouse received the goods.
+     */
+    public function receivingItems(): HasMany
+    {
+        // This links to the items inside the WarehouseReceiving records
+        return $this->hasMany(\App\Models\WarehouseReceivingItem::class, 'material_id');
+    }
+
+    /**
+     * Relationship: Get all purchase order items associated with this material.
+     */
+    public function purchaseOrderItems(): HasMany
+    {
+        return $this->hasMany(\App\Models\Scm\ScmPurchaseOrderItem::class, 'material_id');
+    }
+
+    /**
      * Get the stock items (actual warehouse inventory) for this material.
      */
     public function stockItems(): HasMany
@@ -42,7 +60,6 @@ class Material extends Model
 
     /**
      * Legacy relationship – kept for backward compatibility if needed.
-     * For the new system, use stockItems() instead.
      */
     public function warehouseMaterials(): HasMany
     {
@@ -51,7 +68,6 @@ class Material extends Model
 
     /**
      * Legacy relationship – kept for backward compatibility.
-     * For the new system, use stockItems() and warehouse access via WarehouseStockItem.
      */
     public function warehouses(): BelongsToMany
     {

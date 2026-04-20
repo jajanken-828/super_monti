@@ -12,9 +12,21 @@ class RequestForQuotation extends Model
     protected $table = 'request_for_quotations';
 
     protected $fillable = [
-        'rfq_number', 'mr_ref', 'mr_id', 'material_id', 'material_name',
-        'category', 'unit', 'required_qty', 'deadline', 'sent_at',
-        'delivery_address', 'payment_terms', 'notes', 'supplier_ids', 'status',
+        'rfq_number', 
+        'mr_ref', 
+        'mr_id', 
+        'material_id', 
+        'material_name',
+        'category', 
+        'unit', 
+        'required_qty', 
+        'deadline', 
+        'sent_at',
+        'delivery_address', 
+        'payment_terms', 
+        'notes', 
+        'supplier_ids', 
+        'status',
     ];
 
     protected $casts = [

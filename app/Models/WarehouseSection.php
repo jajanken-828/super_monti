@@ -26,4 +26,8 @@ class WarehouseSection extends Model
     {
         return $this->hasMany(WarehouseShelf::class, 'section_id');
     }
+    public function stockItemsNoShelf() {
+    // Items that belong to this section but have NO specific shelf assigned
+    return $this->hasMany(WarehouseStockItem::class, 'section_id')->whereNull('shelf_id');
+}
 }

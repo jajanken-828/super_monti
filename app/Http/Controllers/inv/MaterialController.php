@@ -6,20 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Models\inv\Material;
 use App\Models\Warehouse;
 use App\Models\WarehouseStockItem;
+use App\Models\Scm\MaterialRequest;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Carbon\Carbon;
 
 class MaterialController extends Controller
 {
     /**
-     * Display a listing of materials.
+     * Display the materials catalog with stock levels and delivery history.
      */
     public function index()
     {
         $user = auth()->user();
 
-        // Determine which warehouses the user can see
-        if ($user->role === 'CEO' || $user->position === 'secretary' || $user->position === 'general_manager') {
+        // 1. Determine warehouse visibility based on role/permissions
+        if ($user->role === 'CEO' || in_array($user->position, ['secretary', 'general_manager'])) {
             $warehouses = Warehouse::all();
         } else {
             $warehouses = $user->warehouseAccess()->get();
@@ -27,26 +29,73 @@ class MaterialController extends Controller
 
         $warehouseIds = $warehouses->pluck('id')->toArray();
 
-        $materials = Material::orderBy('name')->get();
+        // 2. Fetch materials with deep relationships
+        // We include stockItems to grab the specific 'control_number' (Lot Number)
+        $materials = Material::with([
+            'receivingItems.receiving.warehouse', 
+            'receivingItems.receiving.purchaseOrder.items',
+            'stockItems' 
+        ])
+        ->orderBy('name')
+        ->get();
 
         $materialsWithStock = $materials->map(function ($material) use ($warehouseIds) {
+            // Real-time stock calculation across authorized warehouses
             $totalStock = WarehouseStockItem::where('material_id', $material->id)
                 ->whereIn('warehouse_id', $warehouseIds)
                 ->where('status', 'in_stock')
                 ->sum('quantity');
 
-            $status = ($totalStock <= 0) ? 'Out of Stock' : (($totalStock <= $material->reorder_point) ? 'Low Stock' : 'In Stock');
+            $status = ($totalStock <= 0) ? 'out' : (($totalStock <= $material->reorder_point) ? 'low' : 'ok');
+
+            // 3. Map Delivery History from actual Receiving Logs
+            $deliveryHistory = $material->receivingItems->map(function ($item) use ($material) {
+                $receivingRecord = $item->receiving;
+                if (!$receivingRecord) return null;
+                
+                // Link back to PO items to retrieve the historical unit price
+                $poItem = $receivingRecord->purchaseOrder->items
+                    ->where('material_id', $item->material_id)
+                    ->first();
+
+                $unitPrice = (float) ($poItem->unit_price ?? 0);
+
+                /**
+                 * FETCH ACTUAL LOT NUMBER (control_number)
+                 * We find the specific stock record created during this receiving event
+                 */
+                $stockRecord = $material->stockItems
+                    ->where('purchase_order_id', $receivingRecord->scm_purchase_order_id)
+                    ->where('warehouse_id', $receivingRecord->warehouse_id)
+                    ->where('quantity', $item->received_qty)
+                    ->first();
+
+                return [
+                    'po_number'        => $receivingRecord->purchaseOrder->po_number ?? 'N/A',
+                    'receiving_number' => $receivingRecord->receiving_number ?? 'N/A',
+                    // TARGET: control_number column from warehouse_stock_items
+                    'lot_number'       => $stockRecord->control_number ?? 'LOT-GEN-' . $item->id,
+                    'warehouse_name'   => $receivingRecord->warehouse->name ?? 'Primary Hub',
+                    'received_date'    => $receivingRecord->received_at 
+                                            ? Carbon::parse($receivingRecord->received_at)->format('Y-m-d') 
+                                            : 'N/A',
+                    'kg'               => (float) $item->received_qty,
+                    'price_per_kg'     => $unitPrice,
+                    'total_amount'     => (float) ($item->received_qty * $unitPrice),
+                ];
+            })->filter()->values();
 
             return [
-                'id' => $material->id,
-                'mat_id' => $material->mat_id,
-                'name' => $material->name,
-                'category' => $material->category,
-                'unit' => $material->unit,
-                'reorder_point' => (float) $material->reorder_point,
-                'unit_cost' => (float) $material->unit_cost,
-                'total_stock' => (float) $totalStock,
-                'status' => $status,
+                'id'               => $material->id,
+                'mat_id'           => $material->mat_id,
+                'name'             => $material->name,
+                'category'         => $material->category,
+                'unit'             => $material->unit,
+                'reorder_point'    => (float) $material->reorder_point,
+                'unit_cost'        => (float) $material->unit_cost,
+                'total_stock'      => (float) $totalStock,
+                'status'           => $status,
+                'delivery_history' => $deliveryHistory,
             ];
         });
 
@@ -55,54 +104,74 @@ class MaterialController extends Controller
         ]);
     }
 
+    public function material() { return $this->index(); }
+
     /**
-     * Alias for index() to match route expectation.
+     * Handle the Procurement Request (Shopping Cart)
      */
-    public function material()
+    public function procurement(Request $request, $id)
     {
-        return $this->index();
+        dd($request->all());    
+        $material = Material::findOrFail($id);
+
+        // Validating data sent from the Modal
+        $validated = $request->validate([
+            'required_qty' => 'required|numeric|min:0.01',
+            'urgency'      => 'nullable|in:High,Medium,Low',
+            'notes'        => 'nullable|string|max:500',
+        ]);
+
+        MaterialRequest::create([
+            'req_number'    => 'REQ-' . strtoupper(bin2hex(random_bytes(3))),
+            'material_id'   => $material->id,
+            'material_name' => $material->name,
+            'category'      => $material->category,
+            'unit'          => $material->unit,
+            'required_qty'  => $validated['required_qty'] ?? $material->reorder_point,
+            'urgency'       => $validated['urgency'] ?? 'Medium',
+            'notes'         => $validated['notes'] ?? 'Auto-generated from Stock Checker',
+            'requested_by'  => auth()->user()->name,
+            'requested_at'  => now(),
+            'status'        => 'pending',
+        ]);
+
+        return redirect()->back()->with('success', 'Procurement request sent to SCM.');
     }
 
     /**
-     * Store a newly created material.
+     * Store a new material in the system.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'category' => 'required|in:Yarn,Dye,Supplies,Packaging',
-            'unit' => 'required|in:Rolls,Kg,Pcs',
+            'name'          => 'required|string|max:255',
+            'category'      => 'required|in:Yarn,Dye,Supplies,Packaging',
+            'unit'          => 'required|in:Rolls,Kg,Pcs',
             'reorder_point' => 'required|integer|min:0',
-            'unit_cost' => 'required|numeric|min:0',
         ]);
 
-        $material = Material::create([
-            'mat_id' => Material::nextMatId(),
-            'name' => $validated['name'],
-            'category' => $validated['category'],
-            'unit' => $validated['unit'],
+        Material::create([
+            'mat_id'        => Material::nextMatId(),
+            'name'          => $validated['name'],
+            'category'      => $validated['category'],
+            'unit'          => $validated['unit'],
             'reorder_point' => $validated['reorder_point'],
-            'unit_cost' => $validated['unit_cost'],
+            'unit_cost'     => 0, 
         ]);
 
-        return redirect()->back()->with('success', 'Material added successfully.');
+        return redirect()->back()->with('success', 'Material registered successfully.');
     }
 
     /**
-     * Remove the specified material.
+     * Delete material if no stock history exists.
      */
     public function destroy($id)
     {
         $material = Material::findOrFail($id);
-
-        // Prevent deletion if there is any stock item referencing this material
-        $hasStock = WarehouseStockItem::where('material_id', $material->id)->exists();
-        if ($hasStock) {
-            return redirect()->back()->withErrors(['error' => 'Cannot delete material because it has existing stock records.']);
+        if (WarehouseStockItem::where('material_id', $material->id)->exists()) {
+            return redirect()->back()->withErrors(['error' => 'Deletion denied: Material has associated stock records.']);
         }
-
         $material->delete();
-
-        return redirect()->back()->with('success', 'Material deleted successfully.');
+        return redirect()->back()->with('success', 'Material removed.');
     }
 }

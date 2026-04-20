@@ -3,8 +3,10 @@
 namespace App\Models\Scm;
 
 use App\Models\inv\Material;
+use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ScmPurchaseOrderItem extends Model
 {
@@ -15,6 +17,7 @@ class ScmPurchaseOrderItem extends Model
     protected $fillable = [
         'scm_purchase_order_id',
         'material_id',
+        'warehouse_id', // Added to support material delivery tracking
         'material_name',
         'qty',
         'received_qty',
@@ -26,7 +29,7 @@ class ScmPurchaseOrderItem extends Model
     /**
      * Relationship to the purchase order.
      */
-    public function purchaseOrder()
+    public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(ScmPurchaseOrder::class, 'scm_purchase_order_id');
     }
@@ -34,8 +37,16 @@ class ScmPurchaseOrderItem extends Model
     /**
      * Relationship to the material (inventory).
      */
-    public function material()
+    public function material(): BelongsTo
     {
         return $this->belongsTo(Material::class, 'material_id');
+    }
+
+    /**
+     * Relationship to the warehouse where this item was received.
+     */
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id');
     }
 }

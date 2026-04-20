@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
             'position' => \App\Http\Middleware\CheckPosition::class,
+            'geofence' => \App\Http\Middleware\GeofenceAccessMiddleware::class, // ✅ ADDED THIS LINE
             'can.access.eco' => \App\Http\Middleware\CheckEcoAccess::class,
             'can.access.ord' => \App\Http\Middleware\CanAccessOrd::class,
             'can.access.warehouse' => \App\Http\Middleware\CanAccessWarehouse::class,
@@ -30,7 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'can.access.procurement' => \App\Http\Middleware\CanAccessProcurement::class,
             'can.access.logistics' => \App\Http\Middleware\CheckLogisticsAccess::class,
             'module.access' => \App\Http\Middleware\CheckModuleAccess::class,
-            'can.access.man.manager' => \App\Http\Middleware\CheckManufacturingManagerAccess::class, // NEW
+            'can.access.man.manager' => \App\Http\Middleware\CheckManufacturingManagerAccess::class,
             'page.permission' => \App\Http\Middleware\CheckPagePermission::class,
         ]);
 

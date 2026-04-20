@@ -16,25 +16,24 @@ class MonitorController extends Controller
 {
     /**
      * Display the warehouse monitor with grid and stock.
-     * Accessible by CEO, Warehouse Supervisor, or Warehouse Manager.
      */
     public function show(Warehouse $warehouse)
     {
         $user = auth()->user();
-        
-        // Combined access control for all relevant administrative roles
-        if ($user->role !== 'CEO' && 
-            $warehouse->supervisor_id !== $user->id && 
-            $warehouse->manager_id !== $user->id) {
+
+        if ($user->role !== 'CEO' && $warehouse->supervisor_id !== $user->id && $warehouse->manager_id !== $user->id) {
             abort(403, 'You do not have access to this warehouse.');
         }
 
+        // Fetch sections with shelves AND items assigned directly to the section (no shelf)
         $sections = $warehouse->sections()
-            ->with(['shelves.stockItems.material'])
+            ->with(['shelves.stockItems.material', 'stockItemsNoShelf.material'])
             ->get();
 
+        // Fetch stock that has no location assigned yet
         $unassignedStock = WarehouseStockItem::where('warehouse_id', $warehouse->id)
             ->whereNull('shelf_id')
+            ->whereNull('section_id')
             ->with('material')
             ->get();
 
@@ -46,91 +45,118 @@ class MonitorController extends Controller
     }
 
     /**
-     * Update the grid layout, sections, and shelves.
-     * Uses a database transaction to ensure data integrity during rebuild.
+     * Update grid layout and dimensions.
+     * Uses a Sync approach to prevent data loss for existing stock.
      */
     public function updateLayout(Request $request, Warehouse $warehouse)
     {
         $user = auth()->user();
         if ($user->role !== 'CEO' && $warehouse->supervisor_id !== $user->id) {
-            abort(403, 'Unauthorized to update warehouse layout.');
+            abort(403, 'Unauthorized');
         }
 
         $data = $request->validate([
-            'grid_rows' => 'required|integer|min:1|max:20',
-            'grid_cols' => 'required|integer|min:1|max:20',
+            'grid_rows' => 'required|integer',
+            'grid_cols' => 'required|integer',
             'sections' => 'array',
-            'sections.*.name' => 'required|string|max:255',
-            'sections.*.row' => 'required|integer|min:0',
-            'sections.*.col' => 'required|integer|min:0',
-            'sections.*.capacity' => 'nullable|integer',
+            'sections.*.id' => 'nullable',
+            'sections.*.name' => 'required|string',
+            'sections.*.row' => 'required|integer',
+            'sections.*.col' => 'required|integer',
             'sections.*.shelves' => 'array',
-            'sections.*.shelves.*' => 'string|max:50',
         ]);
 
         try {
             DB::beginTransaction();
 
-            // Clear existing layout to perform a clean rebuild
-            $warehouse->sections()->delete();
+            $warehouse->update([
+                'grid_rows' => $data['grid_rows'],
+                'grid_cols' => $data['grid_cols'],
+            ]);
+
+            $activeSectionIds = [];
 
             foreach ($data['sections'] as $sec) {
-                $section = WarehouseSection::create([
-                    'warehouse_id' => $warehouse->id,
-                    'name' => $sec['name'],
-                    'grid_row' => $sec['row'],
-                    'grid_col' => $sec['col'],
-                    'capacity' => $sec['capacity'] ?? null,
-                ]);
+                // If ID is null or starts with 'temp', create new, otherwise update
+                $sectionId = (isset($sec['id']) && !str_starts_with($sec['id'], 'temp-')) ? $sec['id'] : null;
 
-                foreach ($sec['shelves'] as $shelfNumber) {
-                    if (!empty($shelfNumber)) {
-                        WarehouseShelf::create([
-                            'section_id' => $section->id,
-                            'shelf_number' => $shelfNumber,
-                        ]);
+                $section = WarehouseSection::updateOrCreate(
+                    ['id' => $sectionId, 'warehouse_id' => $warehouse->id],
+                    [
+                        'name' => $sec['name'],
+                        'grid_row' => $sec['row'],
+                        'grid_col' => $sec['col'],
+                    ]
+                );
+                $activeSectionIds[] = $section->id;
+
+                $activeShelfIds = [];
+                if (isset($sec['shelves'])) {
+                    foreach ($sec['shelves'] as $sh) {
+                        // Check if shelf is existing or new (ts- prefix)
+                        $shId = (isset($sh['id']) && !str_starts_with($sh['id'], 'ts-')) ? $sh['id'] : null;
+
+                        $shelf = WarehouseShelf::updateOrCreate(
+                            ['id' => $shId, 'section_id' => $section->id],
+                            ['shelf_number' => $sh['shelf_number']]
+                        );
+                        $activeShelfIds[] = $shelf->id;
                     }
                 }
+                // Delete shelves that were removed in the UI
+                $section->shelves()->whereNotIn('id', $activeShelfIds)->delete();
             }
 
+            // Delete sections removed in UI
+            $warehouse->sections()->whereNotIn('id', $activeSectionIds)->delete();
+
             DB::commit();
-            return redirect()->back()->with('success', 'Warehouse layout updated successfully.');
-            
+            return redirect()->back()->with('success', 'Warehouse layout and shelves saved successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Layout save error: ' . $e->getMessage(), [
-                'warehouse_id' => $warehouse->id,
-                'data' => $data,
-            ]);
-            return redirect()->back()->withErrors(['error' => 'Failed to save layout: ' . $e->getMessage()]);
+            Log::error('Layout error: ' . $e->getMessage());
+            return redirect()->back()->withErrors(['error' => 'Creation failed: ' . $e->getMessage()]);
         }
     }
 
     /**
-     * Assign a specific stock item to a shelf.
+     * Assign stock to either a specific shelf OR just a section box.
      */
     public function assignToShelf(Request $request)
     {
         $data = $request->validate([
             'stock_item_id' => 'required|exists:warehouse_stock_items,id',
-            'shelf_id' => 'required|exists:warehouse_shelves,id',
+            'shelf_id'      => 'nullable|exists:warehouse_shelves,id',
+            'section_id'    => 'nullable|exists:warehouse_sections,id',
         ]);
 
         $stock = WarehouseStockItem::findOrFail($data['stock_item_id']);
-        $warehouse = $stock->warehouse;
         $user = auth()->user();
-        
-        if ($user->role !== 'CEO' && $warehouse->supervisor_id !== $user->id) {
+
+        if ($user->role !== 'CEO' && $stock->warehouse->supervisor_id !== $user->id) {
             abort(403, 'Unauthorized to assign stock.');
         }
 
-        $stock->update(['shelf_id' => $data['shelf_id']]);
+        if (!empty($data['shelf_id'])) {
+            // If dropped on a specific shelf
+            $shelf = WarehouseShelf::findOrFail($data['shelf_id']);
+            $stock->update([
+                'shelf_id' => $shelf->id,
+                'section_id' => $shelf->section_id
+            ]);
+        } elseif (!empty($data['section_id'])) {
+            // If dropped on the general area of a section
+            $stock->update([
+                'section_id' => $data['section_id'],
+                'shelf_id' => null
+            ]);
+        }
 
-        return redirect()->back()->with('success', 'Material successfully assigned to shelf.');
+        return redirect()->back()->with('success', 'Material location updated.');
     }
 
     /**
-     * Consume material and send it to a specific manufacturing department.
+     * Consume material and release it to the production floor.
      */
     public function useMaterial(Request $request, WarehouseStockItem $stockItem)
     {
@@ -140,24 +166,23 @@ class MonitorController extends Controller
         ]);
 
         $user = auth()->user();
-        $warehouse = $stockItem->warehouse;
-
-        if ($user->role !== 'CEO' && $warehouse->supervisor_id !== $user->id) {
-            abort(403, 'Unauthorized to process material consumption.');
+        if ($user->role !== 'CEO' && $stockItem->warehouse->supervisor_id !== $user->id) {
+            abort(403, 'Unauthorized.');
         }
 
         if ($data['quantity'] >= $stockItem->quantity) {
-            // Full consumption: mark as used and clear location
+            // Full consumption
             $stockItem->update([
                 'status' => 'used',
                 'quantity' => 0,
                 'shelf_id' => null,
+                'section_id' => null
             ]);
         } else {
             // Partial consumption
             $stockItem->decrement('quantity', $data['quantity']);
         }
 
-        return redirect()->back()->with('success', "{$data['quantity']} {$stockItem->unit}(s) successfully sent to {$data['manufacturing_department']} department.");
+        return redirect()->back()->with('success', "{$data['quantity']} units released to {$data['manufacturing_department']}.");
     }
 }

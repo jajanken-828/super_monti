@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Warehouse extends Model
@@ -28,7 +29,7 @@ class Warehouse extends Model
     /**
      * Get the supervisor user for this warehouse.
      */
-    public function supervisor()
+    public function supervisor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'supervisor_id');
     }
@@ -36,7 +37,7 @@ class Warehouse extends Model
     /**
      * Get the manager user for this warehouse.
      */
-    public function manager()
+    public function managerUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'manager_id');
     }
@@ -51,18 +52,21 @@ class Warehouse extends Model
 
     /**
      * Get all stock items in this warehouse.
+     * This checks if the warehouse is "In Use" before deletion.
      */
     public function stockItems(): HasMany
     {
-        return $this->hasMany(WarehouseStockItem::class);
+        return $this->hasMany(WarehouseStockItem::class, 'warehouse_id');
     }
 
     /**
      * Get all receiving records for this warehouse.
+     * Updated to the correct namespace used in your Scm logic.
      */
     public function receivings(): HasMany
     {
-        return $this->hasMany(WarehouseReceiving::class);
+        // Using the fully qualified namespace to prevent "Class not found" errors
+        return $this->hasMany(\App\Models\WarehouseReceiving::class, 'warehouse_id');
     }
 
     /**

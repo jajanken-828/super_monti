@@ -17,6 +17,9 @@ use Inertia\Inertia;
 
 class ProcurementController extends Controller
 {
+    /**
+     * Display pending material requests forwarded from SCM.
+     */
     public function materialRequests()
     {
         $warehouses = Warehouse::orderBy('name')->get()->map(fn ($w) => [
@@ -39,10 +42,6 @@ class ProcurementController extends Controller
                 'rating' => $s->rating ?? 5.0,
                 'status' => 'Official Vendor',
                 'categories' => $s->categories ? json_decode($s->categories, true) : ['Fabric', 'Trim', 'Chemicals', 'Packaging'],
-                'requirements' => collect($s->vendorRegistration?->requirements ?? [])->map(fn ($req) => [
-                    'name' => $req->requirement_name,
-                    'value' => $req->value,
-                ])->toArray(),
             ]);
 
         $requests = MaterialRequest::with('material')
@@ -72,12 +71,14 @@ class ProcurementController extends Controller
         ]);
     }
 
+    /**
+     * Store a new RFQ and notify selected suppliers.
+     */
     public function createRFQ(Request $request)
     {
         $validated = $request->validate([
             'mr_id' => 'required|exists:material_requests,id',
             'deadline' => 'required|date|after_or_equal:today',
-            'delivery_address' => 'required|string',
             'payment_terms' => 'required|string',
             'notes' => 'nullable|string',
             'selected_suppliers' => 'required|array|min:1',
@@ -98,7 +99,6 @@ class ProcurementController extends Controller
                 'unit' => $mr->unit,
                 'required_qty' => $mr->required_qty,
                 'deadline' => $validated['deadline'],
-                'delivery_address' => $validated['delivery_address'],
                 'payment_terms' => $validated['payment_terms'],
                 'notes' => $validated['notes'],
                 'sent_at' => now(),
@@ -106,19 +106,21 @@ class ProcurementController extends Controller
                 'supplier_ids' => json_encode($validated['selected_suppliers']),
             ]);
 
+            // Update MR status so it disappears from the pending queue
             $mr->update(['status' => 'rfq_sent']);
 
             DB::commit();
-
-            return redirect()->back()->with('success', 'RFQ sent to selected suppliers.');
+            return redirect()->back()->with('success', 'RFQ successfully dispatched to suppliers.');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('RFQ creation failed: '.$e->getMessage());
-
-            return redirect()->back()->withErrors(['error' => 'Failed to create RFQ.']);
+            return redirect()->back()->withErrors(['error' => 'Critical Error: Could not generate RFQ.']);
         }
     }
 
+    /**
+     * Display all sent RFQs and their incoming quotations.
+     */
     public function supplierQuotations()
     {
         $rfqs = RequestForQuotation::with(['responses.supplier'])
@@ -133,28 +135,25 @@ class ProcurementController extends Controller
                 'unit' => $rfq->unit,
                 'required_qty' => $rfq->required_qty,
                 'deadline' => $rfq->deadline,
-                'delivery_address' => $rfq->delivery_address,
-                'sent_at' => $rfq->sent_at,
                 'status' => $rfq->status,
                 'notes' => $rfq->notes,
                 'responses' => $rfq->responses->map(fn ($res) => [
                     'id' => $res->id,
-                    'supplier_id' => $res->supplier_id,
                     'supplier_name' => $res->supplier?->business_name ?? $res->supplier_name,
                     'unit_price' => $res->unit_price,
                     'total_price' => $res->total_price,
                     'lead_time' => $res->lead_time,
-                    'validity_date' => $res->validity_date,
                     'payment_terms' => $res->payment_terms,
-                    'notes' => $res->notes,
                     'status' => $res->status,
-                    'submitted_at' => $res->submitted_at,
                 ]),
-            ]);
+            ]); 
 
         return Inertia::render('Dashboard/PRO/supp_quo', ['rfqs' => $rfqs]);
     }
 
+    /**
+     * Accept a quote, generate a Draft PO with 12% VAT, and decline competitors.
+     */
     public function acceptQuotation(Request $request, $responseId)
     {
         $validated = $request->validate(['rfq_id' => 'required|exists:request_for_quotations,id']);
@@ -165,17 +164,22 @@ class ProcurementController extends Controller
             $rfq = $response->rfq;
             $supplier = Supplier::findOrFail($response->supplier_id);
 
+            // 1. Accept this specific response
             $response->update(['status' => 'accepted']);
+
+            // 2. Automatically decline other competing quotes for this RFQ
             RfqResponse::where('rfq_id', $rfq->id)
                 ->where('id', '!=', $responseId)
                 ->where('status', 'pending_review')
                 ->update(['status' => 'declined']);
 
+            // 3. Financial Calculations (VAT 12%)
             $subtotal = $response->total_price;
-            $taxRate = 10;
+            $taxRate = 12; // Updated to 12% VAT
             $taxAmount = $subtotal * ($taxRate / 100);
             $grandTotal = $subtotal + $taxAmount;
 
+            // 4. Create the Purchase Order
             $po = ScmPurchaseOrder::create([
                 'po_number' => $this->generatePONumber(),
                 'supplier_id' => $supplier->id,
@@ -189,10 +193,11 @@ class ProcurementController extends Controller
                 'tax_rate' => $taxRate,
                 'tax_amount' => $taxAmount,
                 'grand_total' => $grandTotal,
-                'notes' => '',
+                'notes' => 'Quotation accepted via Procurement Manager.',
                 'received' => false,
             ]);
 
+            // 5. Add line item to PO
             $po->items()->create([
                 'material_id' => $rfq->material_id,
                 'material_name' => $rfq->material_name,
@@ -202,34 +207,41 @@ class ProcurementController extends Controller
                 'total' => $response->total_price,
             ]);
 
+            // 6. Close out the RFQ
             $rfq->update(['status' => 'responded']);
 
             DB::commit();
-
-            return redirect()->back()->with('success', 'Quotation accepted. Purchase order created as draft.');
+            return redirect()->back()->with('success', 'Quotation accepted. Scm PO generated as Draft.');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Accept quotation failed: '.$e->getMessage());
-
-            return redirect()->back()->withErrors(['error' => 'Failed to accept quotation.']);
+            return redirect()->back()->withErrors(['error' => 'Failed to process acceptance.']);
         }
     }
 
+    /**
+     * Manually decline a quote with a reason.
+     */
     public function declineQuotation(Request $request, $responseId)
     {
         $validated = $request->validate(['reason' => 'nullable|string|max:500']);
         try {
             $response = RfqResponse::findOrFail($responseId);
-            $response->update(['status' => 'declined', 'decline_reason' => $validated['reason']]);
+            $response->update([
+                'status' => 'declined', 
+                'decline_reason' => $validated['reason']
+            ]);
 
             return redirect()->back()->with('success', 'Quotation declined.');
         } catch (\Exception $e) {
             Log::error('Decline quotation failed: '.$e->getMessage());
-
             return redirect()->back()->withErrors(['error' => 'Failed to decline quotation.']);
         }
     }
 
+    /**
+     * View Purchase Orders and Invoices.
+     */
     public function receipt()
     {
         $purchaseOrders = ScmPurchaseOrder::with('items')
@@ -239,34 +251,16 @@ class ProcurementController extends Controller
                 'id' => $po->id,
                 'po_number' => $po->po_number,
                 'supplier_name' => $po->supplier_name,
-                'rfq_ref' => $po->rfq_ref,
-                'issued_date' => $po->issued_date,
-                'expected_delivery' => $po->expected_delivery,
                 'status' => $po->status,
                 'grand_total' => $po->grand_total,
                 'items' => $po->items->map(fn ($item) => [
-                    'id' => $item->id,
                     'material_name' => $item->material_name,
                     'qty' => $item->qty,
-                    'unit' => $item->unit,
-                    'unit_price' => $item->unit_price,
                     'total' => $item->total,
                 ]),
             ]);
 
-        $invoices = PurchaseInvoice::orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn ($inv) => [
-                'id' => $inv->id,
-                'invoice_number' => $inv->invoice_number,
-                'po_number' => $inv->po_number,
-                'supplier_name' => $inv->supplier_name,
-                'invoice_date' => $inv->invoice_date,
-                'due_date' => $inv->due_date,
-                'amount' => $inv->amount,
-                'payment_terms' => $inv->payment_terms,
-                'status' => $inv->status,
-            ]);
+        $invoices = PurchaseInvoice::orderBy('created_at', 'desc')->get();
 
         return Inertia::render('Dashboard/PRO/receipt', [
             'purchaseOrders' => $purchaseOrders,
@@ -274,25 +268,28 @@ class ProcurementController extends Controller
         ]);
     }
 
+    /**
+     * Send PO to supplier (Change status from Draft to Sent).
+     */
     public function sendPurchaseOrder($poId)
     {
         try {
             $po = ScmPurchaseOrder::findOrFail($poId);
             $po->update(['status' => 'sent']);
-
             return redirect()->back()->with('success', 'Purchase Order sent to supplier.');
         } catch (\Exception $e) {
             Log::error('Send PO failed: '.$e->getMessage());
-
             return redirect()->back()->withErrors(['error' => 'Failed to send PO.']);
         }
     }
 
+    /**
+     * ID Generators
+     */
     private function generateRFQNumber(): string
     {
         $year = now()->format('Y');
         $count = RequestForQuotation::whereYear('created_at', $year)->count() + 1;
-
         return 'RFQ-'.$year.'-'.str_pad($count, 3, '0', STR_PAD_LEFT);
     }
 
@@ -300,7 +297,6 @@ class ProcurementController extends Controller
     {
         $year = now()->format('Y');
         $count = ScmPurchaseOrder::whereYear('created_at', $year)->count() + 1;
-
         return 'SCMPO-'.$year.'-'.str_pad($count, 4, '0', STR_PAD_LEFT);
     }
 }
