@@ -55,12 +55,12 @@ const handleSendAction = () => {
                              <p class="font-black text-lg text-slate-800 dark:text-slate-100 uppercase tracking-tight">{{ req.material_name }}</p>
                         </div>
                         <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                            Required Volume: <span class="text-slate-900 dark:text-slate-300">{{ req.required_qty }} {{ req.unit }}</span>
+                            Volume Order: <span class="text-slate-900 dark:text-slate-300">{{ req.required_qty }} {{ req.unit }}</span>
                         </p>
                     </div>
                     
                     <button @click="confirmSend(req)" class="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:opacity-80 transition shadow-lg shadow-slate-200 dark:shadow-none">
-                        <Send class="w-4 h-4" /> Send to PRO
+                        <Send class="w-4 h-4" /> Send to Procurement
                     </button>
                 </div>
             </div>

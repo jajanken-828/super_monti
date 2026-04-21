@@ -3,9 +3,9 @@ import { ref, computed } from 'vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import {
-    Package, Plus, X, Search, ChevronDown, AlertTriangle, 
+    Package, Plus, X, Search, ChevronDown, AlertTriangle,
     ShoppingCart, Eye, Info, History, TrendingUp, Save,
-    CheckCircle, AlertCircle, Trash2
+    CheckCircle, AlertCircle, Trash2, BadgeCheck
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -18,14 +18,14 @@ const searchQuery = ref('');
 const showAddModal = ref(false);
 const showViewModal = ref(false);
 const showProcurementModal = ref(false);
-const showConfirmModal = ref(false); // Global Confirmation Modal
+const showConfirmModal = ref(false);
 const selectedMaterial = ref(null);
 
 // Configuration for the Global Confirmation Modal
 const confirmConfig = ref({
     title: '',
     message: '',
-    type: 'confirm', // 'confirm' or 'danger'
+    type: 'confirm',
     action: null
 });
 
@@ -119,15 +119,16 @@ const submitUpdate = () => {
 
 const submitProcurement = () => {
     if (procurementForm.required_qty <= 0) return;
-    
+
     triggerConfirm(
         'Send Request',
-        'Send this procurement request to the SCM department?',
+        `Send procurement request for ${selectedMaterial.value.name} (${procurementForm.required_qty} ${selectedMaterial.value.unit}) to SCM?`,
         'confirm',
         () => {
             procurementForm.post(route('inv.checker.procurement', selectedMaterial.value.id), {
                 onSuccess: () => {
                     showProcurementModal.value = false;
+                    procurementForm.reset();
                     closeConfirm();
                 },
             });
@@ -195,7 +196,7 @@ const statusColor = (status) => {
                                     <td class="px-8 py-6 text-center">
                                         <div class="flex items-center justify-center gap-3">
                                             <button @click="openViewModal(mat)" class="p-3 rounded-xl bg-slate-100 text-slate-400 hover:text-slate-900 transition border border-slate-200 shadow-sm"><Eye class="w-4 h-4" /></button>
-                                            <button @click="selectedMaterial = mat; showProcurementModal = true;" class="p-3 rounded-xl bg-blue-50 text-blue-400 hover:text-blue-600 transition border border-blue-100 shadow-sm"><ShoppingCart class="w-4 h-4" /></button>
+                                            <button @click="selectedMaterial = mat; procurementForm.required_qty = mat.reorder_point; showProcurementModal = true;" class="p-3 rounded-xl bg-blue-50 text-blue-400 hover:text-blue-600 transition border border-blue-100 shadow-sm"><ShoppingCart class="w-4 h-4" /></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -206,6 +207,7 @@ const statusColor = (status) => {
             </div>
         </div>
 
+        <!-- Add Material Modal -->
         <Teleport to="body">
             <div v-if="showAddModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md" @click.self="showAddModal = false">
                 <div class="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
@@ -245,6 +247,7 @@ const statusColor = (status) => {
             </div>
         </Teleport>
 
+        <!-- View/Edit Material Modal -->
         <Teleport to="body">
             <div v-if="showViewModal && selectedMaterial" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-lg" @click.self="showViewModal = false">
                 <div class="bg-white dark:bg-gray-900 rounded-[3rem] shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -255,7 +258,7 @@ const statusColor = (status) => {
                         </div>
                         <button @click="showViewModal = false" class="p-3 rounded-full hover:bg-white shadow-sm border border-slate-200 transition"><X class="w-5 h-5" /></button>
                     </div>
-                    
+
                     <div class="p-10 overflow-y-auto space-y-10">
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 font-black uppercase">
                             <div class="p-6 bg-blue-50 border-2 border-blue-200 rounded-[2rem]">
@@ -318,6 +321,47 @@ const statusColor = (status) => {
             </div>
         </Teleport>
 
+        <!-- Procurement Request Modal -->
+        <Teleport to="body">
+            <div v-if="showProcurementModal && selectedMaterial" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-lg" @click.self="showProcurementModal = false">
+                <div class="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+                    <div class="p-8 border-b bg-slate-50 flex items-center justify-between">
+                        <h3 class="text-xl font-black uppercase tracking-tight">Request Procurement</h3>
+                        <button @click="showProcurementModal = false" class="p-2 rounded-full hover:bg-white transition"><X class="w-5 h-5" /></button>
+                    </div>
+                    <div class="p-8 space-y-6">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Material</label>
+                            <p class="text-lg font-black text-slate-800">{{ selectedMaterial.name }}</p>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Quantity  ({{ selectedMaterial.unit }})</label>
+                            <input v-model.number="procurementForm.required_qty" type="number" step="0.01" min="0.01" class="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl focus:ring-2 focus:ring-blue-600/20 font-bold text-sm" />
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Urgency</label>
+                            <select v-model="procurementForm.urgency" class="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl font-bold text-sm">
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Notes (Optional)</label>
+                            <textarea v-model="procurementForm.notes" rows="3" class="w-full px-5 py-4 bg-slate-100 border-none rounded-2xl focus:ring-2 focus:ring-blue-600/20 font-bold text-sm" placeholder="Additional details..."></textarea>
+                        </div>
+                    </div>
+                    <div class="p-8 pt-0 flex gap-4">
+                        <button @click="showProcurementModal = false" class="flex-1 py-5 bg-slate-100 text-slate-500 font-black uppercase text-xs rounded-2xl hover:bg-slate-200 transition">Cancel</button>
+                        <button @click="submitProcurement" :disabled="procurementForm.processing" class="flex-1 py-5 bg-blue-600 text-white font-black uppercase text-xs rounded-2xl hover:bg-blue-700 transition shadow-lg shadow-blue-200">
+                            {{ procurementForm.processing ? 'Sending...' : 'Send to SCM' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- Global Confirmation Modal -->
         <Teleport to="body">
             <div v-if="showConfirmModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
                 <div class="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl border border-slate-100 text-center animate-in zoom-in duration-300">
@@ -338,6 +382,5 @@ const statusColor = (status) => {
 </template>
 
 <style scoped>
-/* Standard fonts only, no italics */
 * { font-style: normal !important; }
 </style>

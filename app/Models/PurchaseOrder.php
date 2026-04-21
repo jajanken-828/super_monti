@@ -75,4 +75,9 @@ class PurchaseOrder extends Model
     {
         return $this->hasMany(JobOrder::class);
     }
+
+    public function manufacturingOrders()
+{
+    return $this->hasMany(ManufacturingOrder::class);
+}
 }

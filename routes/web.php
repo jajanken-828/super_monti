@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\ClientAuthController;
 use App\Http\Controllers\Auth\SupplierAuthController;
 use App\Http\Controllers\ceo\CeoAccessController;
 use App\Http\Controllers\ceo\CeoDashboardController;
+use App\Http\Controllers\ceo\GeolocationController;
 use App\Http\Controllers\client\ClientConversationController;
 use App\Http\Controllers\client\ClientDashboardController;
 use App\Http\Controllers\client\ClientInvoiceController;
@@ -63,6 +64,7 @@ use App\Http\Controllers\logistics\TraineeController as LogisticsTraineeControll
 use App\Http\Controllers\man\ManAccessController;
 use App\Http\Controllers\man\Manager\ManufacturingManagerController;
 use App\Http\Controllers\man\ManDashboardController;
+use App\Http\Controllers\man\ManufacturingInventoryController; // <-- ADDED
 use App\Http\Controllers\man\Staff\CheckerQualityController;
 use App\Http\Controllers\man\Staff\DyeingColorController;
 use App\Http\Controllers\man\Staff\DyeingFabricSoftenerController;
@@ -103,7 +105,6 @@ use App\Http\Controllers\workforce\LeaveController as WorkforceLeaveController;
 use App\Http\Controllers\workforce\SchedulerController;
 use App\Http\Controllers\workforce\WorkforceDashboardController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ceo\GeolocationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -413,7 +414,11 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
     Route::middleware(['can.access.man.manager'])->group(function () {
         Route::get('/access/manage', [ManAccessController::class, 'index'])->name('access.manage');
         Route::post('/access/assign-supervisor', [ManAccessController::class, 'assignSupervisor'])->name('access.assign-supervisor');
-        // Note: updateSupervisorRoles method is removed; no route needed.
+        
+        // Manufacturing Inventory (Production Inventory)
+        Route::get('/inventory', [ManufacturingInventoryController::class, 'index'])->name('inventory.index');
+        Route::post('/inventory/{item}/container', [ManufacturingInventoryController::class, 'updateContainer'])->name('inventory.container.update');
+        Route::post('/inventory/{item}/consume', [ManufacturingInventoryController::class, 'consume'])->name('inventory.consume');
     });
 
     // Staff dashboard entry point (redirects to role-specific dashboard or supervisor manager dashboard)
@@ -614,7 +619,8 @@ Route::prefix('dashboard/inventory')->name('inv.')->middleware(['auth', 'verifie
     Route::delete('/bom/{id}', [BomController::class, 'destroy'])->name('bom.destroy');
 
     Route::get('/checker', [CheckerController::class, 'index'])->name('checker');
-    Route::post('/checker/procurement/{material}', [CheckerController::class, 'requestProcurement'])->name('checker.procurement');
+    // ✅ FIXED: Use MaterialController@procurement for creating procurement requests
+    Route::post('/checker/procurement/{material}', [MaterialController::class, 'procurement'])->name('checker.procurement');
     Route::post('/checker/order/{order}', [CheckerController::class, 'checkOrder'])->name('checker.order');
 
     Route::get('/access', [InvAccessController::class, 'index'])->name('access');
@@ -959,10 +965,10 @@ Route::prefix('dashboard/ceo')->name('ceo.')->middleware(['auth', 'verified', 'r
     Route::get('/access', [CeoAccessController::class, 'index'])->name('access');
     Route::get('/access/employee/{id}/personal-info', [CeoAccessController::class, 'getEmployeePersonalInfo'])->name('access.employeePersonalInfo');
 
-    Route::post('/access/update-position',    [CeoAccessController::class, 'updatePosition'])->name('access.updatePosition');
-    Route::post('/access/update-modules',     [CeoAccessController::class, 'updateModules'])->name('access.updateModules');
+    Route::post('/access/update-position', [CeoAccessController::class, 'updatePosition'])->name('access.updatePosition');
+    Route::post('/access/update-modules', [CeoAccessController::class, 'updateModules'])->name('access.updateModules');
     Route::post('/access/update-staff-pages', [CeoAccessController::class, 'updateStaffPages'])->name('access.updateStaffPages');
-    Route::post('/access/assign-staff-role',  [CeoAccessController::class, 'assignStaffRole'])->name('access.assignStaffRole');
+    Route::post('/access/assign-staff-role', [CeoAccessController::class, 'assignStaffRole'])->name('access.assignStaffRole');
     Route::post('/access/update-profile-photo', [CeoAccessController::class, 'updateProfilePhoto'])->name('access.updateProfilePhoto');
     Route::get('/access/client-assignments/{staffId}', [CeoAccessController::class, 'getClientAssignments'])->name('access.clientAssignments');
     Route::post('/access/assign-clients', [CeoAccessController::class, 'updateClientAssignments'])->name('access.updateClientAssignments');

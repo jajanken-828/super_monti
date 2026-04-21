@@ -202,7 +202,7 @@ const submitRFQ = () => {
                             </div>
                             <div class="mt-6 sm:mt-0">
                                 <button @click="openRFQ(req)" class="w-full sm:w-auto px-8 py-4 bg-gray-900 dark:bg-blue-600 hover:bg-blue-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3">
-                                    Generate RFQ <ArrowRight class="w-4 h-4" />
+                                    Generate Request for Quotation <ArrowRight class="w-4 h-4" />
                                 </button>
                             </div>
                         </div>

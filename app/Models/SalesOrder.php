@@ -45,4 +45,8 @@ class SalesOrder extends Model
     {
         return $this->belongsTo(BomRecord::class, 'recipe_id');
     }
+    public function manufacturingOrder()
+{
+    return $this->hasOne(ManufacturingOrder::class, 'sales_order_id');
+}
 }

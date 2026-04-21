@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\warehouse;
 
 use App\Http\Controllers\Controller;
+use App\Models\ManufacturingInventoryItem;
 use App\Models\Warehouse;
 use App\Models\WarehouseSection;
 use App\Models\WarehouseShelf;
@@ -77,7 +78,6 @@ class MonitorController extends Controller
             $activeSectionIds = [];
 
             foreach ($data['sections'] as $sec) {
-                // If ID is null or starts with 'temp', create new, otherwise update
                 $sectionId = (isset($sec['id']) && !str_starts_with($sec['id'], 'temp-')) ? $sec['id'] : null;
 
                 $section = WarehouseSection::updateOrCreate(
@@ -93,7 +93,6 @@ class MonitorController extends Controller
                 $activeShelfIds = [];
                 if (isset($sec['shelves'])) {
                     foreach ($sec['shelves'] as $sh) {
-                        // Check if shelf is existing or new (ts- prefix)
                         $shId = (isset($sh['id']) && !str_starts_with($sh['id'], 'ts-')) ? $sh['id'] : null;
 
                         $shelf = WarehouseShelf::updateOrCreate(
@@ -103,11 +102,9 @@ class MonitorController extends Controller
                         $activeShelfIds[] = $shelf->id;
                     }
                 }
-                // Delete shelves that were removed in the UI
                 $section->shelves()->whereNotIn('id', $activeShelfIds)->delete();
             }
 
-            // Delete sections removed in UI
             $warehouse->sections()->whereNotIn('id', $activeSectionIds)->delete();
 
             DB::commit();
@@ -138,14 +135,12 @@ class MonitorController extends Controller
         }
 
         if (!empty($data['shelf_id'])) {
-            // If dropped on a specific shelf
             $shelf = WarehouseShelf::findOrFail($data['shelf_id']);
             $stock->update([
                 'shelf_id' => $shelf->id,
                 'section_id' => $shelf->section_id
             ]);
         } elseif (!empty($data['section_id'])) {
-            // If dropped on the general area of a section
             $stock->update([
                 'section_id' => $data['section_id'],
                 'shelf_id' => null
@@ -156,10 +151,25 @@ class MonitorController extends Controller
     }
 
     /**
-     * Consume material and release it to the production floor.
+     * Transfer material to manufacturing production inventory.
+     *
+     * FIXES APPLIED:
+     * 1. Null-safe access to $stockItem->material->category via optional chaining.
+     * 2. Wrapped in try/catch so failures surface a real error instead of 500.
+     * 3. Explicit load of material relationship before use to avoid lazy-load miss.
      */
     public function useMaterial(Request $request, WarehouseStockItem $stockItem)
     {
+        // Eagerly load material to avoid silent null failures
+        $stockItem->load('material');
+
+        // Guard: if the material record no longer exists, bail early with a clear message
+        if (!$stockItem->material) {
+            return redirect()->back()->withErrors([
+                'error' => "Material record not found for stock item {$stockItem->control_number}. Cannot transfer.",
+            ]);
+        }
+
         $data = $request->validate([
             'quantity' => 'required|numeric|min:0.01|max:' . $stockItem->quantity,
             'manufacturing_department' => 'required|string|in:knitting,dyeing,maintenance,packaging',
@@ -170,19 +180,69 @@ class MonitorController extends Controller
             abort(403, 'Unauthorized.');
         }
 
-        if ($data['quantity'] >= $stockItem->quantity) {
-            // Full consumption
-            $stockItem->update([
-                'status' => 'used',
-                'quantity' => 0,
-                'shelf_id' => null,
-                'section_id' => null
+        $quantityToTransfer = $data['quantity'];
+        $department         = $data['manufacturing_department'];
+
+        // Determine the category value to store.
+        // Falls back to a safe default if for any reason it's null.
+        $category = $stockItem->material->category ?? 'General';
+
+        try {
+            DB::transaction(function () use ($stockItem, $quantityToTransfer, $department, $user, $category) {
+                // 1. Create manufacturing inventory record.
+                //    control_number is unique per stock item, so the same item can only
+                //    be transferred once. Attempting to transfer again (after partial deduction)
+                //    uses the same control_number → unique constraint fires.
+                //    RESOLUTION: we check if the control_number already exists and increment
+                //    the existing record's quantity instead of creating a duplicate.
+                $existing = ManufacturingInventoryItem::where('control_number', $stockItem->control_number)->first();
+
+                if ($existing) {
+                    // Add to the existing manufacturing inventory record
+                    $existing->increment('initial_quantity',   $quantityToTransfer);
+                    $existing->increment('remaining_quantity',  $quantityToTransfer);
+                    if ($existing->status === 'depleted') {
+                        $existing->update(['status' => 'available']);
+                    }
+                } else {
+                    ManufacturingInventoryItem::create([
+                        'control_number'          => $stockItem->control_number,
+                        'material_id'             => $stockItem->material_id,
+                        'warehouse_stock_item_id' => $stockItem->id,
+                        'initial_quantity'        => $quantityToTransfer,
+                        'remaining_quantity'      => $quantityToTransfer,
+                        'unit'                    => $stockItem->unit,
+                        'category'                => $category,
+                        'status'                  => 'available',
+                        'department'              => $department,
+                        'received_at'             => now(),
+                        'received_from'           => $user->id,
+                        'notes'                   => "Transferred from warehouse by {$user->name}",
+                    ]);
+                }
+
+                // 2. Deduct from warehouse stock.
+                if ($quantityToTransfer >= $stockItem->quantity) {
+                    $stockItem->update([
+                        'status'     => 'used',
+                        'quantity'   => 0,
+                        'shelf_id'   => null,
+                        'section_id' => null,
+                    ]);
+                } else {
+                    $stockItem->decrement('quantity', $quantityToTransfer);
+                }
+            });
+        } catch (\Exception $e) {
+            Log::error("useMaterial failed for stock item {$stockItem->id}: " . $e->getMessage());
+            return redirect()->back()->withErrors([
+                'error' => 'Transfer failed: ' . $e->getMessage(),
             ]);
-        } else {
-            // Partial consumption
-            $stockItem->decrement('quantity', $data['quantity']);
         }
 
-        return redirect()->back()->with('success', "{$data['quantity']} units released to {$data['manufacturing_department']}.");
+        return redirect()->back()->with(
+            'success',
+            "{$quantityToTransfer} {$stockItem->unit} of {$stockItem->material->name} transferred to {$department} department."
+        );
     }
 }

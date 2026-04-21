@@ -52,6 +52,7 @@ const isProOpen = ref(getStored('pro'))
 const isManOpen = ref(getStored('man'))
 const isOrdOpen = ref(getStored('ord'))
 const isLogisticsOpen = ref(getStored('logistics'))
+const isQualityCheckerOpen = ref(getStored('quality_checker'))
 
 // For dynamically created role dropdowns inside MAN
 const roleDropdownStates = ref({})
@@ -80,6 +81,7 @@ const togglePro = () => { isProOpen.value = !isProOpen.value; setStored('pro', i
 const toggleMan = () => { isManOpen.value = !isManOpen.value; setStored('man', isManOpen.value) }
 const toggleOrd = () => { isOrdOpen.value = !isOrdOpen.value; setStored('ord', isOrdOpen.value) }
 const toggleLogistics = () => { isLogisticsOpen.value = !isLogisticsOpen.value; setStored('logistics', isLogisticsOpen.value) }
+const toggleQualityChecker = () => { isQualityCheckerOpen.value = !isQualityCheckerOpen.value; setStored('quality_checker', isQualityCheckerOpen.value) }
 
 // ─── SCROLL POSITION PERSISTENCE ──────────────────────────────────────────────
 const sidebarScrollRef = ref(null)
@@ -426,13 +428,28 @@ const navItems = computed(() => {
     }
 
     const getFilteredManChildren = () => {
-        // Manager-level pages (direct links)
+        // Quality Checker dropdown items using direct URLs (to avoid Ziggy errors)
+        const qualityCheckerChildren = [
+            { label: 'Dashboard', href: '/dashboard/man/checker-quality', icon: LayoutDashboard },
+            { label: 'Production', href: '/dashboard/man/checker-quality/production', icon: ClipboardList },
+        ]
+
+        // Manager-level pages
         const managerChildren = [
             { label: 'Dashboard', href: route('man.manager.dashboard'), icon: Factory, permKey: 'dashboard' },
             { label: 'Production Orders', href: route('man.manager.production'), icon: ClipboardList, permKey: 'production' },
             { label: 'Rejected Items', href: route('man.manager.rejected'), icon: XCircle, permKey: 'reject' },
-            // FIX: replaced broken named route with direct URL
-            { label: 'Quality Checker', href: '/dashboard/man/checker-quality', icon: CheckCircle2, permKey: 'checker' },
+            // NEW: Production Inventory link
+            { label: 'Production Inventory', href: route('man.inventory.index'), icon: Boxes, permKey: 'inventory' },
+            // Quality Checker as dropdown
+            {
+                label: 'Quality Checker',
+                icon: CheckCircle2,
+                isDropdown: true,
+                isOpen: isQualityCheckerOpen.value,
+                toggle: toggleQualityChecker,
+                children: qualityCheckerChildren
+            },
             { label: 'Interviews', href: route('man.interview.index'), icon: Eye, permKey: 'interview' },
             { label: 'Trainees', href: route('man.trainee.index'), icon: Award, permKey: 'trainee' },
         ]
@@ -549,7 +566,7 @@ const navItems = computed(() => {
     const getFilteredWarehouseChildren = () => {
         const all = [
             { label: 'All Warehouses', href: route('warehouse.index'), icon: Warehouse, permKey: 'warehouse' },
-            { label: 'Monitor', href: route('warehouse.monitor', { warehouse: 'placeholder' }), icon: Eye, permKey: 'monitor' },
+            // { label: 'Monitor', href: route('warehouse.monitor', { warehouse: 'placeholder' }), icon: Eye, permKey: 'monitor' },
             { label: 'Receiving', href: route('warehouse.receiving'), icon: Truck, permKey: 'receiving' },
             { label: 'Packages', href: route('warehouse.packages'), icon: Package, permKey: 'packages' },
             { label: 'Rejects', href: route('warehouse.rejects'), icon: XCircle, permKey: 'reject' },

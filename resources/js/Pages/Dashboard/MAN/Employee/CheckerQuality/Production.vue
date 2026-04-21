@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Package, Shirt, Droplet, Factory, Iron, Box, CheckCircle, XCircle, ArrowRight } from 'lucide-vue-next';
+import { Package, Shirt, Droplet, Factory, Box, CheckCircle, XCircle, ArrowRight } from 'lucide-vue-next'; // removed Iron
 
 const props = defineProps({
     orders: Array,
@@ -25,7 +25,7 @@ const passDye = (dyeId, action) => {
     router.post(route('man.staff.checker-quality.pass-dye', dyeId), { action });
 };
 
-// ... similar for other passes
+// Note: You need to define passSoftener, passIron, packForm, rejectForm, assignToOrder if used
 </script>
 
 <template>
@@ -135,7 +135,6 @@ const passDye = (dyeId, action) => {
 
             <!-- Softener & Squeezer Tab -->
             <div v-if="activeTab === 'softener'">
-                <!-- Display softener jobs with status: softener -> squeezer -> quality check -->
                 <div v-for="job in softenerJobs" :key="job.id" class="bg-white p-4 rounded-lg shadow mb-4">
                     <div>
                         <p class="font-bold">{{ job.code }}</p>

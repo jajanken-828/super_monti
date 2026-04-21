@@ -8,6 +8,7 @@ class ManufacturingOrder extends Model
 {
     protected $fillable = [
         'purchase_order_id',
+        'sales_order_id',
         'total_quantity',
         'remaining_quantity',
         'status',
@@ -23,6 +24,11 @@ class ManufacturingOrder extends Model
     public function purchaseOrder()
     {
         return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function salesOrder()
+    {
+        return $this->belongsTo(SalesOrder::class);
     }
 
     public function fabrics()

@@ -12,6 +12,7 @@ use App\Models\SalesOrder;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ManufacturingManagerController extends Controller
@@ -77,9 +78,13 @@ class ManufacturingManagerController extends Controller
     public function production()
     {
         // 1. Fetch Purchase Orders (from SCM) with stage 'man_production'
+        //    Exclude those that already have a pending/in_progress manufacturing order
         $purchaseOrders = PurchaseOrder::with(['client', 'items.product'])
             ->whereHas('queue', function ($q) {
                 $q->where('stage', 'man_production');
+            })
+            ->whereDoesntHave('manufacturingOrders', function ($q) {
+                $q->whereIn('status', ['pending', 'in_progress']);
             })
             ->get()
             ->map(function ($order) {
@@ -99,9 +104,13 @@ class ManufacturingManagerController extends Controller
                 ];
             });
 
-        // 2. Fetch Sales Orders (Job Orders) with status 'in_production' (pushed from SCM)
+        // 2. Fetch Sales Orders (Job Orders) with status 'in_production'
+        //    Exclude those that already have a manufacturing order (via sales_order_id)
         $salesOrders = SalesOrder::with(['client', 'recipe'])
             ->where('status', 'in_production')
+            ->whereDoesntHave('manufacturingOrder', function ($q) {
+                $q->whereIn('status', ['pending', 'in_progress']);
+            })
             ->get()
             ->map(function ($order) {
                 // Build item representation
@@ -179,40 +188,62 @@ class ManufacturingManagerController extends Controller
         $type = $request->input('type', 'purchase_order');
         $user = Auth::user();
 
-        if ($type === 'purchase_order') {
-            $order = PurchaseOrder::findOrFail($orderId);
-            $totalQuantity = $order->items->sum('quantity');
+        DB::beginTransaction();
+        try {
+            if ($type === 'purchase_order') {
+                $order = PurchaseOrder::findOrFail($orderId);
 
-            ManufacturingOrder::create([
-                'purchase_order_id' => $order->id,
-                'total_quantity'    => $totalQuantity,
-                'remaining_quantity'=> $totalQuantity,
-                'status'            => 'pending',
-                'notes'             => 'Forwarded to manufacturing by ' . $user->name,
-            ]);
+                // Check if already forwarded
+                $existing = ManufacturingOrder::where('purchase_order_id', $order->id)
+                    ->whereIn('status', ['pending', 'in_progress'])
+                    ->first();
+                if ($existing) {
+                    return redirect()->back()->with('error', 'This Purchase Order has already been forwarded to production.');
+                }
 
-            // Keep the queue stage as man_production (already set by SCM push)
-            // You may update it if needed; currently no change required.
+                $totalQuantity = $order->items->sum('quantity');
 
-        } elseif ($type === 'sales_order') {
-            $order = SalesOrder::findOrFail($orderId);
-            $totalQuantity = $order->quantity ?? 0;
+                ManufacturingOrder::create([
+                    'purchase_order_id' => $order->id,
+                    'total_quantity'    => $totalQuantity,
+                    'remaining_quantity'=> $totalQuantity,
+                    'status'            => 'pending',
+                    'notes'             => 'Forwarded to manufacturing by ' . $user->name,
+                ]);
 
-            // Create ManufacturingOrder record for the sales order
-            ManufacturingOrder::create([
-                'sales_order_id'     => $order->id,
-                'total_quantity'     => $totalQuantity,
-                'remaining_quantity' => $totalQuantity,
-                'status'             => 'pending',
-                'notes'              => 'Forwarded to manufacturing by ' . $user->name,
-            ]);
+                // Optionally update queue stage? Already man_production, keep as is.
 
-            // Status remains 'in_production' (already set by SCM push)
-        } else {
-            abort(400, 'Invalid order type.');
+            } elseif ($type === 'sales_order') {
+                $order = SalesOrder::findOrFail($orderId);
+                $totalQuantity = $order->quantity ?? 0;
+
+                // Check if already forwarded
+                $existing = ManufacturingOrder::where('sales_order_id', $order->id)
+                    ->whereIn('status', ['pending', 'in_progress'])
+                    ->first();
+                if ($existing) {
+                    return redirect()->back()->with('error', 'This Job Order has already been forwarded to production.');
+                }
+
+                ManufacturingOrder::create([
+                    'sales_order_id'     => $order->id,
+                    'total_quantity'     => $totalQuantity,
+                    'remaining_quantity' => $totalQuantity,
+                    'status'             => 'pending',
+                    'notes'              => 'Forwarded to manufacturing by ' . $user->name,
+                ]);
+
+                // Status remains 'in_production' (already set by SCM push)
+            } else {
+                abort(400, 'Invalid order type.');
+            }
+
+            DB::commit();
+            return redirect()->back()->with('message', 'Order forwarded to production successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Failed to forward order: ' . $e->getMessage());
         }
-
-        return redirect()->back()->with('message', 'Order forwarded to production successfully.');
     }
 
     public function updateStaffRole(Request $request, $staffId)
