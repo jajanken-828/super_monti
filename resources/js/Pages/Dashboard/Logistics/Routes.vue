@@ -3,7 +3,7 @@
     <AuthenticatedLayout>
         <div class="max-w-[1600px] mx-auto space-y-10 p-4 lg:p-10">
 
-            <!-- Header -->
+            <!-- ── Header ────────────────────────────────────────────────── -->
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div class="space-y-1">
                     <div class="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-[0.2em]">
@@ -14,15 +14,66 @@
                         Delivery <span class="text-indigo-600">Routes</span>
                     </h1>
                     <p class="text-sm font-medium text-gray-500 italic">
-                        Define and manage delivery routes, distances, and estimated travel times.
+                        Map-driven delivery routes from MontiTextiles HQ to all business clients.
                     </p>
                 </div>
-                <button @click="openCreateModal" class="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 transition flex items-center gap-2">
+                <button @click="openCreateModal"
+                    class="px-6 py-3 rounded-2xl bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg shadow-indigo-200 dark:shadow-none">
                     <Plus class="h-4 w-4" /> Add Route
                 </button>
             </div>
 
-            <!-- Stats Summary -->
+            <!-- ── Live Route Map ─────────────────────────────────────────── -->
+            <div class="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+                <div class="px-8 py-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="h-8 w-8 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                            <Globe class="h-4 w-4 text-indigo-600" />
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Network Map</p>
+                            <p class="text-sm font-black text-gray-900 dark:text-white">All Routes & Client Locations</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> MontiTextiles HQ
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Client Locations
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-6 h-1 rounded-full bg-indigo-500 inline-block"></span> Delivery Routes
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative p-3">
+                    <div v-if="!montiLocation"
+                        class="absolute inset-3 z-10 flex items-center justify-center bg-amber-50/90 dark:bg-amber-900/30 backdrop-blur-sm rounded-3xl border-2 border-dashed border-amber-300">
+                        <div class="text-center">
+                            <AlertTriangle class="h-8 w-8 text-amber-500 mx-auto mb-2" />
+                            <p class="text-sm font-black text-amber-700 dark:text-amber-400">MontiTextiles HQ location not set.</p>
+                            <p class="text-xs text-amber-600 mt-1">Please set a location in the CEO Geolocation module first.</p>
+                        </div>
+                    </div>
+                    <div id="main-map" class="w-full rounded-3xl z-0" style="height:520px;"></div>
+                </div>
+
+                <div class="px-8 py-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-widest">
+                    <div class="flex items-center gap-2 text-gray-500">
+                        <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                        Live Map Active
+                    </div>
+                    <div class="text-gray-400">{{ routes.length }} Route{{ routes.length !== 1 ? 's' : '' }} Mapped</div>
+                    <div class="text-gray-400">{{ clients.length }} Client{{ clients.length !== 1 ? 's' : '' }} Pinned</div>
+                    <div v-if="montiLocation" class="text-gray-400">
+                        HQ: {{ Number(montiLocation.latitude).toFixed(4) }}, {{ Number(montiLocation.longitude).toFixed(4) }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Stats Summary ──────────────────────────────────────────── -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="bg-white dark:bg-gray-900 p-7 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm">
                     <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Routes</p>
@@ -33,17 +84,17 @@
                     <p class="text-3xl font-black text-indigo-600 mt-1">{{ avgDistance }} km</p>
                 </div>
                 <div class="bg-white dark:bg-gray-900 p-7 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm">
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Avg Duration</p>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Avg Est. Time</p>
                     <p class="text-3xl font-black text-amber-600 mt-1">{{ avgDuration }} min</p>
                 </div>
             </div>
 
-            <!-- Routes Table -->
+            <!-- ── Routes Table ──────────────────────────────────────────── -->
             <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
                 <div class="px-8 py-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                    <div class="relative flex-1 lg:w-96 group">
+                    <div class="relative lg:w-96">
                         <Search class="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <input v-model="searchTerm" type="text" placeholder="Search by name, origin, or destination..."
+                        <input v-model="searchTerm" type="text" placeholder="Search routes..."
                             class="w-full pl-11 pr-4 py-3.5 rounded-2xl border-gray-100 dark:border-gray-800 dark:bg-gray-950 text-[10px] font-black uppercase tracking-widest">
                     </div>
                 </div>
@@ -53,50 +104,76 @@
                         <thead class="bg-gray-50/50 dark:bg-gray-800/30 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">
                             <tr>
                                 <th class="px-8 py-5">Route Name</th>
+                                <th class="px-8 py-5">Client</th>
                                 <th class="px-8 py-5">Origin</th>
                                 <th class="px-8 py-5">Destination</th>
-                                <th class="px-8 py-5 text-right">Distance (km)</th>
-                                <th class="px-8 py-5 text-right">Est. Time (min)</th>
+                                <th class="px-8 py-5 text-right">Distance</th>
+                                <th class="px-8 py-5 text-right">Est. Time</th>
                                 <th class="px-8 py-5 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
-                            <tr v-for="route in filteredRoutes" :key="route.id" class="group hover:bg-gray-50/50 transition-all">
+                            <tr v-for="(r, idx) in filteredRoutes" :key="r.id"
+                                class="group hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-all cursor-pointer"
+                                @click="flyToRoute(r)">
                                 <td class="px-8 py-6">
                                     <div class="flex items-center gap-3">
-                                        <div class="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600">
-                                            <Navigation class="h-5 w-5" />
+                                        <div class="h-10 w-10 rounded-xl flex items-center justify-center text-white text-xs font-black"
+                                            :style="{ background: routeColors[idx % routeColors.length] }">
+                                            {{ idx + 1 }}
                                         </div>
-                                        <span class="font-black text-gray-900 dark:text-white">{{ route.name }}</span>
+                                        <div>
+                                            <p class="font-black text-gray-900 dark:text-white">{{ r.name }}</p>
+                                            <span v-if="parseGeometry(r.route_geometry)"
+                                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 text-[9px] font-black uppercase tracking-widest">
+                                                <span class="w-1 h-1 bg-emerald-500 rounded-full"></span> Road Route
+                                            </span>
+                                            <span v-else
+                                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-500 text-[9px] font-black uppercase tracking-widest">
+                                                ⚠ No road data — edit to fix
+                                            </span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-8 py-6">
+                                    <span v-if="r.client" class="text-sm font-bold text-gray-700 dark:text-gray-300">{{ r.client.company_name }}</span>
+                                    <span v-else class="text-xs text-gray-400 italic">—</span>
+                                </td>
+                                <td class="px-8 py-6">
+                                    <div class="flex items-center gap-1">
+                                        <MapPin class="h-3 w-3 text-blue-400 flex-shrink-0" />
+                                        <span class="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[160px]">{{ r.origin }}</span>
                                     </div>
                                 </td>
                                 <td class="px-8 py-6">
                                     <div class="flex items-center gap-1">
-                                        <MapPin class="h-3 w-3 text-gray-400" />
-                                        <span class="text-sm">{{ route.origin }}</span>
+                                        <Flag class="h-3 w-3 text-emerald-400 flex-shrink-0" />
+                                        <span class="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[160px]">{{ r.destination }}</span>
                                     </div>
                                 </td>
-                                <td class="px-8 py-6">
-                                    <div class="flex items-center gap-1">
-                                        <Flag class="h-3 w-3 text-gray-400" />
-                                        <span class="text-sm">{{ route.destination }}</span>
-                                    </div>
-                                </td>
-                                <td class="px-8 py-6 text-right font-bold">{{ route.distance_km?.toLocaleString() || 0 }} km</td>
-                                <td class="px-8 py-6 text-right">{{ route.estimated_minutes }} min</td>
                                 <td class="px-8 py-6 text-right">
+                                    <span class="font-black text-gray-900 dark:text-white">{{ Number(r.distance_km).toFixed(1) }}</span>
+                                    <span class="text-xs text-gray-400 ml-1">km</span>
+                                </td>
+                                <td class="px-8 py-6 text-right">
+                                    <span class="font-black text-amber-600">{{ r.estimated_minutes }}</span>
+                                    <span class="text-xs text-gray-400 ml-1">min</span>
+                                </td>
+                                <td class="px-8 py-6 text-right" @click.stop>
                                     <div class="flex items-center justify-end gap-2">
-                                        <button @click="openEditModal(route)" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                                        <button @click="openEditModal(r)"
+                                            class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition">
                                             <Edit class="h-4 w-4 text-gray-500" />
                                         </button>
-                                        <button @click="confirmDelete(route)" class="p-2 rounded-lg hover:bg-red-50 transition">
+                                        <button @click="confirmDelete(r)"
+                                            class="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition">
                                             <Trash2 class="h-4 w-4 text-red-500" />
                                         </button>
                                     </div>
                                 </td>
                             </tr>
                             <tr v-if="filteredRoutes.length === 0">
-                                <td colspan="6" class="px-8 py-20 text-center text-gray-400 uppercase font-black italic">
+                                <td colspan="7" class="px-8 py-20 text-center text-gray-400 uppercase font-black italic">
                                     <Navigation class="h-12 w-12 mx-auto mb-3 opacity-30" />
                                     No routes found. Click "Add Route" to create your first delivery route.
                                 </td>
@@ -107,89 +184,171 @@
             </div>
         </div>
 
-        <!-- Create/Edit Modal -->
+        <!-- ── Create / Edit Modal ──────────────────────────────────────── -->
         <Teleport to="body">
-            <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeModal">
-                <div class="bg-white dark:bg-gray-900 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
-                    <div class="px-6 py-4 bg-indigo-600 text-white flex justify-between items-center">
-                        <h3 class="font-black text-lg">{{ isEditing ? 'Edit Route' : 'Add New Route' }}</h3>
-                        <button @click="closeModal" class="p-1 hover:bg-white/20 rounded-lg"><X class="h-5 w-5" /></button>
+            <div v-if="showModal"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                @click.self="closeModal">
+                <div class="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
+
+                    <div class="px-6 py-4 bg-indigo-600 text-white flex justify-between items-center flex-shrink-0">
+                        <div class="flex items-center gap-3">
+                            <Navigation class="h-5 w-5" />
+                            <h3 class="font-black text-lg">{{ isEditing ? 'Edit Route' : 'Add New Route' }}</h3>
+                        </div>
+                        <button @click="closeModal" class="p-1.5 hover:bg-white/20 rounded-lg transition">
+                            <X class="h-5 w-5" />
+                        </button>
                     </div>
 
-                    <form @submit.prevent="submitForm" class="p-6 space-y-5">
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Route Name *</label>
-                            <input v-model="form.name" type="text" required
-                                class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500"
-                                placeholder="e.g., Manila to Cavite">
-                        </div>
-
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Origin *</label>
-                            <input v-model="form.origin" type="text" required
-                                class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500"
-                                placeholder="Starting point">
-                        </div>
-
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Destination *</label>
-                            <input v-model="form.destination" type="text" required
-                                class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500"
-                                placeholder="Delivery point">
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Distance (km) *</label>
-                                <input v-model.number="form.distance_km" type="number" step="0.01" min="0" required
-                                    class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500">
+                    <div class="overflow-y-auto flex-1">
+                        <!-- Mini preview map -->
+                        <div class="relative" style="height: 260px;">
+                            <div id="modal-map" class="w-full h-full z-0"></div>
+                            <div class="absolute top-3 left-3 z-[1000] pointer-events-none">
+                                <div class="bg-slate-900/80 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-[9px] tracking-widest font-black uppercase flex items-center gap-2">
+                                    <div class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></div>
+                                    Route Preview
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Est. Time (min) *</label>
-                                <input v-model.number="form.estimated_minutes" type="number" min="1" required
-                                    class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500">
+                            <div v-if="isCalculating"
+                                class="absolute inset-0 z-[1000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                                <div class="bg-white dark:bg-gray-900 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-xl">
+                                    <Loader2 class="h-5 w-5 animate-spin text-indigo-600" />
+                                    <span class="text-[11px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-300">
+                                        Calculating Road Route…
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Waypoints (Optional)</label>
-                            <textarea v-model="form.waypoints_text" rows="3"
-                                class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 font-mono"
-                                placeholder="One per line:&#10;Quezon City&#10;Pasay&#10;Paranaque"></textarea>
-                            <p class="text-[9px] text-gray-400 mt-1">List intermediate stops (one per line) for GPS navigation</p>
-                        </div>
+                        <div class="p-6 space-y-5">
 
-                        <div class="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
-                            <button type="button" @click="closeModal"
-                                class="flex-1 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-[10px] font-black uppercase hover:bg-gray-50 transition">
-                                Cancel
-                            </button>
-                            <button type="submit" :disabled="form.processing"
-                                class="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
-                                <Loader2 v-if="form.processing" class="h-4 w-4 animate-spin" />
-                                {{ form.processing ? 'Saving...' : (isEditing ? 'Update' : 'Create') }}
-                            </button>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Route Name *</label>
+                                <input v-model="form.name" type="text" required
+                                    class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="e.g., MontiTextiles → OmniTech Express">
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">
+                                    Origin <span class="text-indigo-400">(MontiTextiles HQ — Auto)</span>
+                                </label>
+                                <div class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-indigo-50/50 dark:bg-indigo-900/10 px-4 py-3 text-sm flex items-center gap-2">
+                                    <MapPin class="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                    <span v-if="montiLocation" class="text-gray-700 dark:text-gray-300 font-medium">
+                                        MontiTextiles HQ —
+                                        <span class="font-mono text-xs text-gray-500">
+                                            {{ Number(montiLocation.latitude).toFixed(6) }}, {{ Number(montiLocation.longitude).toFixed(6) }}
+                                        </span>
+                                    </span>
+                                    <span v-else class="text-amber-600 italic text-xs">
+                                        ⚠ HQ location not set.
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">
+                                    Destination — Client *
+                                </label>
+                                <div v-if="clients.length === 0" class="w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700 font-medium">
+                                    ⚠ No clients have pinned their location yet.
+                                </div>
+                                <select v-else v-model="form.client_id" required
+                                    class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500">
+                                    <option value="">— Select a business client —</option>
+                                    <option v-for="c in clients" :key="c.id" :value="c.id">
+                                        {{ c.company_name }} — {{ [c.company_address, c.city, c.province].filter(Boolean).join(', ') }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">
+                                        Distance (km) <span class="text-indigo-400 ml-1">Auto</span>
+                                    </label>
+                                    <div class="relative">
+                                        <input v-model.number="form.distance_km" type="number" step="0.01" min="0" required
+                                            class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500"
+                                            :class="{ 'opacity-60': isCalculating }">
+                                        <Loader2 v-if="isCalculating" class="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-indigo-400" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">
+                                        Est. Time (min) <span class="text-indigo-400 ml-1">Auto</span>
+                                    </label>
+                                    <div class="relative">
+                                        <input v-model.number="form.estimated_minutes" type="number" min="1" required
+                                            class="w-full rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500"
+                                            :class="{ 'opacity-60': isCalculating }">
+                                        <Loader2 v-if="isCalculating" class="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-indigo-400" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Route source label / recalculate button -->
+                            <div class="flex items-center justify-between gap-4">
+                                <p v-if="routeSourceLabel" class="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+                                    <CheckCircle2 class="h-3 w-3 text-emerald-500 flex-shrink-0" />
+                                    {{ routeSourceLabel }}
+                                </p>
+                                <!-- Recalculate — useful for old routes that were saved without road geometry -->
+                                <button v-if="form.client_id" type="button" @click="recalculate"
+                                    :disabled="isCalculating"
+                                    class="ml-auto flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition disabled:opacity-50">
+                                    <RefreshCw class="h-3 w-3" :class="{ 'animate-spin': isCalculating }" />
+                                    Recalculate Road Route
+                                </button>
+                            </div>
+
+                            <div class="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                <button type="button" @click="closeModal"
+                                    class="flex-1 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-[10px] font-black uppercase hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                    Cancel
+                                </button>
+                                <button type="button" @click="submitForm"
+                                    :disabled="form.processing || isCalculating || !form.client_id || !form.distance_km"
+                                    class="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                                    <Loader2 v-if="form.processing" class="h-4 w-4 animate-spin" />
+                                    {{ form.processing ? 'Saving…' : (isEditing ? 'Update Route' : 'Create Route') }}
+                                </button>
+                            </div>
                         </div>
-                    </form>
+                    </div>
                 </div>
             </div>
         </Teleport>
 
-        <!-- Delete Confirmation Modal -->
+        <!-- ── Delete Modal ───────────────────────────────────────────────── -->
         <Teleport to="body">
-            <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="showDeleteModal = false">
-                <div class="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div v-if="showDeleteModal"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                @click.self="showDeleteModal = false">
+                <div class="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
                     <div class="px-6 py-4 bg-red-600 text-white flex justify-between items-center">
                         <h3 class="font-black text-lg">Delete Route</h3>
-                        <button @click="showDeleteModal = false" class="p-1 hover:bg-white/20 rounded-lg"><X class="h-5 w-5" /></button>
+                        <button @click="showDeleteModal = false" class="p-1 hover:bg-white/20 rounded-lg">
+                            <X class="h-5 w-5" />
+                        </button>
                     </div>
                     <div class="p-6 space-y-4">
-                        <p class="text-gray-700 dark:text-gray-300">Are you sure you want to delete <span class="font-bold">{{ routeToDelete?.name }}</span>?</p>
-                        <p class="text-xs text-red-500">This action cannot be undone. Active deliveries using this route will be affected.</p>
+                        <p class="text-gray-700 dark:text-gray-300">
+                            Are you sure you want to delete
+                            <span class="font-bold">{{ routeToDelete?.name }}</span>?
+                        </p>
+                        <p class="text-xs text-red-500">This removes the route line from the map and cannot be undone.</p>
                         <div class="flex gap-3">
-                            <button @click="showDeleteModal = false" class="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-[10px] font-black uppercase hover:bg-gray-50 transition">Cancel</button>
-                            <button @click="deleteRoute" :disabled="deleting" class="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-red-700 transition disabled:opacity-50">
-                                <Loader2 v-if="deleting" class="h-4 w-4 animate-spin inline mr-1" />
+                            <button @click="showDeleteModal = false"
+                                class="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-[10px] font-black uppercase hover:bg-gray-50 transition">
+                                Cancel
+                            </button>
+                            <button @click="deleteRoute" :disabled="deleting"
+                                class="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                                <Loader2 v-if="deleting" class="h-4 w-4 animate-spin" />
                                 Delete
                             </button>
                         </div>
@@ -198,80 +357,349 @@
             </div>
         </Teleport>
 
-        <!-- Toast Notification -->
+        <!-- ── Toast ─────────────────────────────────────────────────────── -->
         <Transition name="toast">
-            <div v-if="toast.show" class="fixed bottom-8 right-8 z-50 px-6 py-3 rounded-xl shadow-lg text-white font-bold text-sm"
-                :class="toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'">
+            <div v-if="toast.show"
+                class="fixed bottom-8 right-8 z-[9999] px-6 py-3 rounded-xl shadow-lg text-white font-bold text-sm flex items-center gap-2"
+                :class="toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'warning' ? 'bg-amber-500' : 'bg-red-600'">
+                <CheckCircle2 v-if="toast.type === 'success'" class="h-4 w-4" />
+                <AlertTriangle v-else-if="toast.type === 'warning'" class="h-4 w-4" />
+                <X v-else class="h-4 w-4" />
                 {{ toast.message }}
             </div>
         </Transition>
+
     </AuthenticatedLayout>
 </template>
 
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
-import { MapPin, Navigation, Plus, Search, Edit, Trash2, X, Loader2, Flag } from 'lucide-vue-next';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import {
+    MapPin, Navigation, Plus, Search, Edit, Trash2, X,
+    Loader2, Flag, Globe, AlertTriangle, CheckCircle2, RefreshCw
+} from 'lucide-vue-next';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import axios from 'axios';
 
+// ── Props ─────────────────────────────────────────────────────────────────
 const props = defineProps({
-    routes: {
-        type: Array,
-        default: () => []
+    routes:        { type: Array,  default: () => [] },
+    clients:       { type: Array,  default: () => [] },
+    montiLocation: { type: Object, default: null },
+});
+
+const routeColors = [
+    '#6366f1', '#f59e0b', '#10b981', '#ef4444',
+    '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
+];
+
+// ── Map state ─────────────────────────────────────────────────────────────
+let mainMap           = null;
+let mainMarkers       = [];
+let mainPolylines     = [];
+let modalMap          = null;
+let modalOriginMarker = null;
+let modalDestMarker   = null;
+let modalRoutePolyline = null;
+
+// ── UI state ───────────────────────────────────────────────────────────────
+const searchTerm       = ref('');
+const showModal        = ref(false);
+const isEditing        = ref(false);
+const editingId        = ref(null);
+const showDeleteModal  = ref(false);
+const routeToDelete    = ref(null);
+const deleting         = ref(false);
+const isCalculating    = ref(false);
+const routeSourceLabel = ref('');
+const toast            = ref({ show: false, type: 'success', message: '' });
+
+// ── Form ───────────────────────────────────────────────────────────────────
+const form = useForm({
+    name:              '',
+    client_id:         '',
+    origin:            '',
+    origin_lat:        null,
+    origin_lng:        null,
+    destination:       '',
+    destination_lat:   null,
+    destination_lng:   null,
+    distance_km:       0,
+    estimated_minutes: 0,
+    route_geometry:    null,
+});
+
+const montiLat = computed(() =>
+    props.montiLocation ? Number(props.montiLocation.latitude)  : 14.4167
+);
+const montiLng = computed(() =>
+    props.montiLocation ? Number(props.montiLocation.longitude) : 121.0000
+);
+
+// ─────────────────────────────────────────────────────────────────────────
+// GEOMETRY HELPER
+// Safely handles route_geometry whether it's a JS array (fresh from OSRM)
+// or a JSON string (retrieved from DB when the Route model lacks an array cast).
+// ─────────────────────────────────────────────────────────────────────────
+const parseGeometry = (geom) => {
+    if (!geom) return null;
+    if (Array.isArray(geom))   return geom.length > 1 ? geom : null;
+    if (typeof geom === 'string') {
+        try {
+            const p = JSON.parse(geom);
+            return Array.isArray(p) && p.length > 1 ? p : null;
+        } catch { return null; }
+    }
+    return null;
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// MAIN MAP
+// ─────────────────────────────────────────────────────────────────────────
+const buildMontiIcon = (size = 34) => L.divIcon({
+    className: '',
+    html: `<div style="background:#3b82f6;color:white;border-radius:50%;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 3px 10px rgba(59,130,246,0.5);font-size:${size * 0.45}px;">🏭</div>`,
+    iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+});
+
+const buildClientIcon = (size = 30) => L.divIcon({
+    className: '',
+    html: `<div style="background:#10b981;color:white;border-radius:50%;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 3px 10px rgba(16,185,129,0.5);font-size:${size * 0.45}px;">📦</div>`,
+    iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+});
+
+const initMainMap = () => {
+    if (mainMap) return;
+    const street    = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20 });
+    mainMap = L.map('main-map', { center: [montiLat.value, montiLng.value], zoom: 11, layers: [street] });
+    L.control.layers({ 'Street': street, 'Satellite': satellite }).addTo(mainMap);
+    L.marker([montiLat.value, montiLng.value], { icon: buildMontiIcon(34) })
+        .bindPopup('<strong style="font-size:13px;">🏭 MontiTextiles HQ</strong><br><span style="font-size:11px;color:#6366f1;">Origin of all delivery routes</span>')
+        .addTo(mainMap);
+    refreshMainMapClients();
+    refreshMainMapRoutes();
+};
+
+const refreshMainMapClients = () => {
+    mainMarkers.forEach(m => m.remove());
+    mainMarkers = [];
+    props.clients.forEach(c => {
+        if (!c.latitude || !c.longitude) return;
+        const marker = L.marker([Number(c.latitude), Number(c.longitude)], { icon: buildClientIcon(30) })
+            .bindPopup(`<strong style="font-size:13px;">📦 ${c.company_name}</strong><br><span style="font-size:11px;color:#555;">${[c.company_address, c.city, c.province].filter(Boolean).join(', ')}</span><br><span style="font-size:10px;color:#aaa;">${Number(c.latitude).toFixed(5)}, ${Number(c.longitude).toFixed(5)}</span>`)
+            .addTo(mainMap);
+        mainMarkers.push(marker);
+    });
+};
+
+const refreshMainMapRoutes = () => {
+    mainPolylines.forEach(p => p.remove());
+    mainPolylines = [];
+
+    props.routes.forEach((r, idx) => {
+        const color = routeColors[idx % routeColors.length];
+        const geom  = parseGeometry(r.route_geometry);
+        let polyline;
+
+        if (geom) {
+            // ✅ Real road path stored in DB
+            polyline = L.polyline(geom, { color, weight: 5, opacity: 0.85 });
+        } else if (r.origin_lat && r.origin_lng && r.destination_lat && r.destination_lng) {
+            // Fallback: dashed straight line (no geometry saved yet)
+            polyline = L.polyline([
+                [Number(r.origin_lat),      Number(r.origin_lng)],
+                [Number(r.destination_lat), Number(r.destination_lng)],
+            ], { color, weight: 4, opacity: 0.6, dashArray: '10, 6' });
+        } else {
+            return;
+        }
+
+        polyline.bindPopup(`
+            <strong style="font-size:13px;">${r.name}</strong><br>
+            <span style="font-size:11px;color:#555;">📍 ${r.origin}<br>🏁 ${r.destination}</span><br>
+            <span style="font-size:11px;color:${color};font-weight:900;">${Number(r.distance_km).toFixed(1)} km · ${r.estimated_minutes} min</span>
+            ${geom ? '<br><span style="font-size:10px;color:#10b981;font-weight:900;">✓ Real road path</span>' : '<br><span style="font-size:10px;color:#f59e0b;font-weight:900;">⚠ Straight-line estimate — edit route to fix</span>'}
+        `);
+        polyline.addTo(mainMap);
+        mainPolylines.push(polyline);
+    });
+};
+
+const flyToRoute = (r) => {
+    if (!mainMap) return;
+    const geom = parseGeometry(r.route_geometry);
+    if (geom) {
+        mainMap.fitBounds(L.polyline(geom).getBounds(), { padding: [60, 60], maxZoom: 14 });
+    } else if (r.origin_lat && r.destination_lat) {
+        mainMap.fitBounds([
+            [Number(r.origin_lat), Number(r.origin_lng)],
+            [Number(r.destination_lat), Number(r.destination_lng)],
+        ], { padding: [60, 60], maxZoom: 13 });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// MODAL PREVIEW MAP
+// ─────────────────────────────────────────────────────────────────────────
+const initModalMap = () => {
+    const el = document.getElementById('modal-map');
+    if (!el) return;
+    if (modalMap) { modalMap.remove(); modalMap = null; }
+    modalMap = L.map('modal-map', { center: [montiLat.value, montiLng.value], zoom: 11 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(modalMap);
+    modalOriginMarker = L.marker([montiLat.value, montiLng.value], { icon: buildMontiIcon(28) })
+        .bindPopup('MontiTextiles HQ').addTo(modalMap);
+
+    const savedGeom = parseGeometry(form.route_geometry);
+    if (isEditing.value && savedGeom) {
+        modalRoutePolyline = L.polyline(savedGeom, { color: '#6366f1', weight: 5 }).addTo(modalMap);
+        modalMap.fitBounds(modalRoutePolyline.getBounds(), { padding: [30, 30] });
+    }
+    if (isEditing.value && form.destination_lat && form.destination_lng) {
+        modalDestMarker = L.marker([form.destination_lat, form.destination_lng], { icon: buildClientIcon(28) }).addTo(modalMap);
+    }
+};
+
+const updateModalMapRoute = (geometry, oLat, oLng, dLat, dLng) => {
+    if (!modalMap) return;
+    if (modalDestMarker)    { modalDestMarker.remove();    modalDestMarker    = null; }
+    if (modalRoutePolyline) { modalRoutePolyline.remove(); modalRoutePolyline = null; }
+    modalDestMarker = L.marker([dLat, dLng], { icon: buildClientIcon(28) }).addTo(modalMap);
+    const geom = parseGeometry(geometry);
+    if (geom) {
+        modalRoutePolyline = L.polyline(geom, { color: '#6366f1', weight: 5, opacity: 0.85 }).addTo(modalMap);
+        modalMap.fitBounds(modalRoutePolyline.getBounds(), { padding: [30, 30] });
+    } else {
+        modalRoutePolyline = L.polyline([[oLat, oLng], [dLat, dLng]], { color: '#6366f1', weight: 4, dashArray: '10, 6', opacity: 0.7 }).addTo(modalMap);
+        modalMap.fitBounds(modalRoutePolyline.getBounds(), { padding: [30, 30] });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// OSRM ROUTE CALCULATION (browser-side — for live modal preview only)
+// Even if this fails, the controller will retry OSRM server-side on save,
+// so there are no CORS/network issues blocking real road geometry.
+// ─────────────────────────────────────────────────────────────────────────
+const haversineKm = (lat1, lng1, lat2, lng2) => {
+    const R    = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a    = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const computeRoute = async (client) => {
+    if (!client?.latitude || !client?.longitude) return;
+    isCalculating.value    = true;
+    routeSourceLabel.value = '';
+
+    const oLat = montiLat.value;
+    const oLng = montiLng.value;
+    const dLat = Number(client.latitude);
+    const dLng = Number(client.longitude);
+
+    try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson`;
+        const res = await axios.get(url, { timeout: 10000 });
+
+        if (res.data?.routes?.length) {
+            const r                = res.data.routes[0];
+            form.distance_km       = parseFloat((r.distance / 1000).toFixed(2));
+            form.estimated_minutes = Math.ceil(r.duration / 60);
+            // OSRM returns [lng, lat] — flip to [lat, lng] for Leaflet
+            form.route_geometry    = r.geometry.coordinates.map(c => [c[1], c[0]]);
+            routeSourceLabel.value = `✓ Road route — ${form.distance_km} km, ~${form.estimated_minutes} min`;
+        } else {
+            throw new Error('No routes');
+        }
+    } catch {
+        // Browser OSRM failed — controller will retry server-side on save
+        const dist             = haversineKm(oLat, oLng, dLat, dLng);
+        form.distance_km       = parseFloat(dist.toFixed(2));
+        form.estimated_minutes = Math.ceil((dist / 40) * 60);
+        form.route_geometry    = null;
+        routeSourceLabel.value = `Preview: straight-line estimate — server will compute road route on save`;
+    } finally {
+        isCalculating.value = false;
+        updateModalMapRoute(form.route_geometry, oLat, oLng, dLat, dLng);
+    }
+};
+
+// Recalculate button — lets users fix existing straight-line routes
+const recalculate = async () => {
+    const client = props.clients.find(c => c.id == form.client_id);
+    if (client) await computeRoute(client);
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// WATCHERS
+// ─────────────────────────────────────────────────────────────────────────
+watch(() => form.client_id, async (newId) => {
+    if (!newId) return;
+    const client = props.clients.find(c => c.id == newId);
+    if (!client) return;
+    form.origin          = 'MontiTextiles HQ';
+    form.origin_lat      = montiLat.value;
+    form.origin_lng      = montiLng.value;
+    form.destination     = [client.company_name, client.company_address, client.city, client.province].filter(Boolean).join(', ');
+    form.destination_lat = Number(client.latitude);
+    form.destination_lng = Number(client.longitude);
+    await computeRoute(client);
+});
+
+watch(showModal, (val) => {
+    if (val) {
+        nextTick(() => setTimeout(() => initModalMap(), 80));
+    } else {
+        if (modalMap) {
+            modalMap.remove();
+            modalMap = modalOriginMarker = modalDestMarker = modalRoutePolyline = null;
+        }
+        routeSourceLabel.value = '';
     }
 });
 
-// Filter
-const searchTerm = ref('');
+watch(() => props.routes,  () => { if (mainMap) refreshMainMapRoutes();  }, { deep: true });
+watch(() => props.clients, () => { if (mainMap) refreshMainMapClients(); }, { deep: true });
 
-// Modal states
-const showModal = ref(false);
-const isEditing = ref(false);
-const editingId = ref(null);
-const showDeleteModal = ref(false);
-const routeToDelete = ref(null);
-const deleting = ref(false);
-const toast = ref({ show: false, type: 'success', message: '' });
+onMounted(() => nextTick(() => initMainMap()));
 
-const form = useForm({
-    name: '',
-    origin: '',
-    destination: '',
-    distance_km: 0,
-    estimated_minutes: 0,
-    waypoints_text: ''
-});
-
+// ─────────────────────────────────────────────────────────────────────────
+// COMPUTED
+// ─────────────────────────────────────────────────────────────────────────
 const filteredRoutes = computed(() => {
     if (!searchTerm.value) return props.routes;
-    const term = searchTerm.value.toLowerCase();
-    return props.routes.filter(r => 
-        r.name.toLowerCase().includes(term) ||
-        r.origin.toLowerCase().includes(term) ||
-        r.destination.toLowerCase().includes(term)
+    const t = searchTerm.value.toLowerCase();
+    return props.routes.filter(r =>
+        r.name.toLowerCase().includes(t) ||
+        r.origin.toLowerCase().includes(t) ||
+        r.destination.toLowerCase().includes(t) ||
+        (r.client?.company_name || '').toLowerCase().includes(t)
     );
 });
 
 const avgDistance = computed(() => {
     if (!props.routes.length) return 0;
-    const sum = props.routes.reduce((acc, r) => acc + (r.distance_km || 0), 0);
-    return (sum / props.routes.length).toFixed(1);
+    return (props.routes.reduce((s, r) => s + Number(r.distance_km || 0), 0) / props.routes.length).toFixed(1);
 });
 
 const avgDuration = computed(() => {
     if (!props.routes.length) return 0;
-    const sum = props.routes.reduce((acc, r) => acc + (r.estimated_minutes || 0), 0);
-    return Math.round(sum / props.routes.length);
+    return Math.round(props.routes.reduce((s, r) => s + (r.estimated_minutes || 0), 0) / props.routes.length);
 });
 
-const showToast = (type, message) => {
+// ─────────────────────────────────────────────────────────────────────────
+// MODAL ACTIONS
+// ─────────────────────────────────────────────────────────────────────────
+const showToast  = (type, message) => {
     toast.value = { show: true, type, message };
-    setTimeout(() => { toast.value.show = false; }, 3000);
+    setTimeout(() => { toast.value.show = false; }, 3500);
 };
-
-const refreshData = () => {
-    router.reload({ only: ['routes'] });
-};
+const refreshData = () => router.reload({ only: ['routes', 'clients', 'montiLocation'] });
 
 const openCreateModal = () => {
     isEditing.value = false;
@@ -280,72 +708,63 @@ const openCreateModal = () => {
     showModal.value = true;
 };
 
-const openEditModal = (route) => {
-    isEditing.value = true;
-    editingId.value = route.id;
-    form.name = route.name;
-    form.origin = route.origin;
-    form.destination = route.destination;
-    form.distance_km = route.distance_km;
-    form.estimated_minutes = route.estimated_minutes;
-    form.waypoints_text = route.waypoints ? route.waypoints.join('\n') : '';
-    showModal.value = true;
+const openEditModal = (r) => {
+    isEditing.value         = true;
+    editingId.value         = r.id;
+    form.name               = r.name;
+    form.client_id          = r.client_id || '';
+    form.origin             = r.origin;
+    form.origin_lat         = r.origin_lat;
+    form.origin_lng         = r.origin_lng;
+    form.destination        = r.destination;
+    form.destination_lat    = r.destination_lat;
+    form.destination_lng    = r.destination_lng;
+    form.distance_km        = r.distance_km;
+    form.estimated_minutes  = r.estimated_minutes;
+    form.route_geometry     = parseGeometry(r.route_geometry); // normalize to array
+    showModal.value         = true;
+    const geom = parseGeometry(r.route_geometry);
+    routeSourceLabel.value  = geom
+        ? `✓ Saved road route — ${r.distance_km} km, ~${r.estimated_minutes} min`
+        : `⚠ No road data saved — click Recalculate to fix`;
 };
 
-const closeModal = () => {
-    showModal.value = false;
-    form.reset();
-};
+const closeModal = () => { showModal.value = false; form.reset(); };
 
 const submitForm = () => {
-    // Convert waypoints text to array
-    const waypoints = form.waypoints_text
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0);
-
     const payload = {
-        name: form.name,
-        origin: form.origin,
-        destination: form.destination,
-        distance_km: form.distance_km,
+        name:              form.name,
+        client_id:         form.client_id || null,
+        origin:            form.origin || 'MontiTextiles HQ',
+        origin_lat:        form.origin_lat  || montiLat.value,
+        origin_lng:        form.origin_lng  || montiLng.value,
+        destination:       form.destination,
+        destination_lat:   form.destination_lat,
+        destination_lng:   form.destination_lng,
+        distance_km:       form.distance_km,
         estimated_minutes: form.estimated_minutes,
-        waypoints: waypoints.length ? waypoints : null
+        route_geometry:    form.route_geometry,
     };
+
+    const onSuccess = (msg) => { showToast('success', msg); closeModal(); refreshData(); };
+    const onError   = (errors) => showToast('error', Object.values(errors)[0] || 'Save failed.');
 
     if (isEditing.value) {
         router.put(route('logistics.routes.update', editingId.value), payload, {
             preserveScroll: true,
-            onSuccess: () => {
-                showToast('success', 'Route updated successfully.');
-                closeModal();
-                refreshData();
-            },
-            onError: (errors) => {
-                const errorMsg = Object.values(errors)[0] || 'Update failed.';
-                showToast('error', errorMsg);
-            }
+            onSuccess: () => onSuccess('Route updated successfully.'),
+            onError,
         });
     } else {
         router.post(route('logistics.routes.store'), payload, {
             preserveScroll: true,
-            onSuccess: () => {
-                showToast('success', 'Route created successfully.');
-                closeModal();
-                refreshData();
-            },
-            onError: (errors) => {
-                const errorMsg = Object.values(errors)[0] || 'Creation failed.';
-                showToast('error', errorMsg);
-            }
+            onSuccess: () => onSuccess('Route created successfully.'),
+            onError,
         });
     }
 };
 
-const confirmDelete = (route) => {
-    routeToDelete.value = route;
-    showDeleteModal.value = true;
-};
+const confirmDelete = (r) => { routeToDelete.value = r; showDeleteModal.value = true; };
 
 const deleteRoute = () => {
     deleting.value = true;
@@ -354,25 +773,23 @@ const deleteRoute = () => {
         onSuccess: () => {
             showToast('success', `Route "${routeToDelete.value.name}" deleted.`);
             showDeleteModal.value = false;
-            routeToDelete.value = null;
+            routeToDelete.value   = null;
             refreshData();
         },
-        onError: (errors) => {
-            showToast('error', 'Failed to delete route. It may be in use.');
-        },
-        onFinish: () => {
-            deleting.value = false;
-        }
+        onError:  () => showToast('error', 'Failed to delete route.'),
+        onFinish: () => { deleting.value = false; },
     });
 };
 </script>
 
 <style scoped>
-.toast-enter-active, .toast-leave-active {
-    transition: all 0.3s ease;
+.toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(20px); }
+:deep(.leaflet-control-layers) {
+    border-radius: 1rem !important; border: none !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.12); padding: 6px 10px;
+    font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
 }
-.toast-enter-from, .toast-leave-to {
-    opacity: 0;
-    transform: translateY(20px);
-}
+:deep(.leaflet-popup-content-wrapper) { border-radius: 1rem !important; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+:deep(.leaflet-popup-tip) { display: none; }
 </style>

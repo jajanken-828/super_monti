@@ -60,6 +60,7 @@ use App\Http\Controllers\logistics\LogisticsDashboardController;
 use App\Http\Controllers\logistics\ProofController;
 use App\Http\Controllers\logistics\ReportController;
 use App\Http\Controllers\logistics\RoutesController;
+use App\Http\Controllers\logistics\TrackingController;
 use App\Http\Controllers\logistics\TraineeController as LogisticsTraineeController;
 use App\Http\Controllers\man\ManAccessController;
 use App\Http\Controllers\man\Manager\ManufacturingManagerController;
@@ -278,6 +279,7 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
 
     // Generate Payroll Form
     Route::get('/payroll/generate', [PayrollController::class, 'create'])->name('payroll.generate');
+
     // Generate Payroll Submission (POST)
     Route::post('/payroll/generate', [PayrollController::class, 'generate'])
         ->middleware('page.permission:payroll,edit')
@@ -707,7 +709,11 @@ Route::middleware(['auth', 'verified', 'module.access:LOG'])->prefix('dashboard/
     Route::get('/access-control', [LogAccessController::class, 'index'])->name('access.index');
     Route::post('/access-control', [LogAccessController::class, 'update'])->name('access.update');
 
+    // ── Delivery Routes (map-based, client-linked) ────────────────────────
     Route::get('/routes', [RoutesController::class, 'index'])->name('routes');
+    Route::post('/routes', [RoutesController::class, 'store'])->name('routes.store');
+    Route::put('/routes/{route}', [RoutesController::class, 'update'])->name('routes.update');
+    Route::delete('/routes/{route}', [RoutesController::class, 'destroy'])->name('routes.destroy');
 
     // ========== INTERVIEWS & TRAINEES (LOGISTICS) ==========
     // Page permission middleware removed – any LOG module user can manage interviews and trainees
@@ -721,6 +727,15 @@ Route::middleware(['auth', 'verified', 'module.access:LOG'])->prefix('dashboard/
     Route::post('/trainee/{id}/grade', [LogisticsTraineeController::class, 'grade'])->name('trainee.grade');
     Route::post('/trainee/{id}/pass', [LogisticsTraineeController::class, 'pass'])->name('trainee.pass');
     Route::post('/trainee/{id}/fail', [LogisticsTraineeController::class, 'fail'])->name('trainee.fail');
+
+    // Tracking & Live Map
+    Route::get('/tracking', [TrackingController::class, 'index'])->name('tracking');
+
+    // Driver profile update
+Route::post('/driver/profile', [DriverController::class, 'updateProfile'])->name('driver.profile.update');
+
+// Test delivery completion
+Route::post('/driver/test-delivered/{delivery}', [DriverController::class, 'testDelivered'])->name('driver.test-delivered');
 });
 
 /*

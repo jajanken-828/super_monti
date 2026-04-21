@@ -505,6 +505,7 @@ const navItems = computed(() => {
             { label: 'Interviews', href: route('logistics.interview.index'), icon: Eye },
             { label: 'Trainees', href: route('logistics.trainee.index'), icon: Award },
             { label: 'Routes', href: route('logistics.routes'), icon: Navigation },
+            { label: 'Tracking', href: route('logistics.tracking'), icon: MapPin },  // ← NEW
             { label: 'Proof', href: route('logistics.proof.index'), icon: Camera },
             { label: 'Reports', href: route('logistics.reports.index'), icon: FileText },
         ]

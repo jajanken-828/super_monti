@@ -18,18 +18,33 @@ class ClientProfileController extends Controller
     public function update(Request $request)
     {
         $client = Auth::guard('client')->user();
+
         $validated = $request->validate([
-            'company_name' => 'required|string|max:255',
-            'contact_person' => 'required|string|max:255',
-            'phone' => 'required|string|max:20',
+            'company_name'    => 'required|string|max:255',
+            'business_type'   => 'required|string|max:255',
+            'tin_number'      => 'nullable|string|max:50',
+            'contact_person'  => 'required|string|max:255',
+            'phone'           => 'required|string|max:20',
             'company_address' => 'required|string',
-            'city' => 'nullable|string',
-            'province' => 'nullable|string',
-            'postal_code' => 'nullable|string',
-            'latitude' => 'nullable|numeric',
-            'longitude' => 'nullable|numeric',
+            'city'            => 'nullable|string|max:100',
+            'province'        => 'nullable|string|max:100',
+            'postal_code'     => 'nullable|string|max:20',
+            'latitude'        => 'nullable|numeric|between:-90,90',
+            'longitude'       => 'nullable|numeric|between:-180,180',
         ]);
+
+        // Explicitly cast lat/lng to float so they are never stored as strings,
+        // and preserve null when the client hasn't pinned a location yet.
+        $validated['latitude']  = isset($validated['latitude'])
+            ? (float) $validated['latitude']
+            : null;
+
+        $validated['longitude'] = isset($validated['longitude'])
+            ? (float) $validated['longitude']
+            : null;
+
         $client->update($validated);
+
         return back()->with('success', 'Profile updated.');
     }
 }

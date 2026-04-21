@@ -32,6 +32,8 @@ class Client extends Authenticatable
         'status',
         'credit_limit',
         'payment_terms_days',
+        'latitude',   // ← ADDED
+        'longitude',  // ← ADDED
     ];
 
     /**
@@ -50,10 +52,12 @@ class Client extends Authenticatable
      * @var array<string, string>
      */
     protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-        'credit_limit' => 'decimal:2',
+        'email_verified_at'  => 'datetime',
+        'password'           => 'hashed',
+        'credit_limit'       => 'decimal:2',
         'payment_terms_days' => 'integer',
+        'latitude'           => 'float',  // ← ADDED
+        'longitude'          => 'float',  // ← ADDED
     ];
 
     /**
@@ -76,7 +80,6 @@ class Client extends Authenticatable
 
     public function creditAccount()
     {
-        // Adjust 'CreditAccount::class' to your actual Credit model name
         return $this->hasOne(CreditAccount::class);
     }
 
