@@ -7,13 +7,9 @@ defineProps<{
     laravelVersion: string;
     phpVersion: string;
 }>();
-
-// Omitted modules array as they were not actively being used in the template, 
-// keeping the script clean and focused.
 </script>
 
 <template>
-
     <Head title="Monti ERP | Industrial Textile Management" />
 
     <div class="relative min-h-screen flex flex-col font-sans bg-cover bg-center bg-no-repeat bg-fixed"
@@ -46,7 +42,8 @@ defineProps<{
                         class="text-xs sm:text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-600/30 active:scale-95">
                         Enterprise Dashboard
                     </Link>
-                    <Link v-else-if="$page.props.auth?.supplier" :href="route('supplier.dashboard')"
+                    <!-- Cast to any to avoid TypeScript error about missing 'supplier' -->
+                    <Link v-else-if="($page.props.auth as any)?.supplier" :href="route('supplier.dashboard')"
                         class="text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-600/30 active:scale-95">
                         Supplier Hub
                     </Link>
@@ -89,7 +86,8 @@ defineProps<{
                     </p>
                 </section>
 
-                <div v-if="canRegister && !$page.props.auth?.user && !$page.props.auth?.supplier"
+                <!-- Cast auth to any to avoid TS error on supplier property -->
+                <div v-if="canRegister && !$page.props.auth?.user && !($page.props.auth as any)?.supplier"
                     class="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto w-full">
 
                     <div
@@ -231,7 +229,8 @@ defineProps<{
                 </div>
 
                 <div class="flex flex-wrap gap-6 justify-center">
-                    <template v-if="!$page.props.auth?.user && !$page.props.auth?.supplier">
+                    <!-- Cast auth to any to avoid TS error -->
+                    <template v-if="!$page.props.auth?.user && !($page.props.auth as any)?.supplier">
                         <Link :href="route('login')"
                             class="text-[10px] font-bold text-slate-300 hover:text-white transition-colors uppercase tracking-widest">
                             Employee Portal

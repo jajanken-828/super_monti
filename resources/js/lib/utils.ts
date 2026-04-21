@@ -12,15 +12,21 @@ export function cn(...inputs: ClassValue[]) {
 export const ROLES = {
     HRM: 'HRM',
     SCM: 'SCM'
-};
+} as const;
 
 export const POSITIONS = {
     MANAGER: 'manager',
     STAFF: 'staff'
-};
+} as const;
 
-export function getDashboardPath(user) {
-    const paths = {
+// Minimal user type – adjust fields as needed
+interface User {
+    role: string;
+    position: string;
+}
+
+export function getDashboardPath(user: User): string {
+    const paths: Record<string, Record<string, string>> = {
         [ROLES.HRM]: {
             [POSITIONS.STAFF]: '/dashboard/hrm/employee',
             [POSITIONS.MANAGER]: '/dashboard/hrm/manager'
@@ -34,7 +40,11 @@ export function getDashboardPath(user) {
     return paths[user.role]?.[user.position] || '/dashboard';
 }
 
-export function hasPermission(user, requiredRole, requiredPosition = null) {
+export function hasPermission(
+    user: User | null | undefined,
+    requiredRole: string,
+    requiredPosition: string | null = null
+): boolean {
     if (!user) return false;
     if (user.role !== requiredRole) return false;
     if (requiredPosition && user.position !== requiredPosition) return false;

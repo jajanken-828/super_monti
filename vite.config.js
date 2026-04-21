@@ -1,12 +1,15 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
-import path from 'path'; // Add this line
+import path from 'path';
 
 export default defineConfig({
     plugins: [
         laravel({
-            input: 'resources/js/app.js',
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.ts',   // ← changed from .js to .ts
+            ],
             refresh: true,
         }),
         vue({
@@ -20,7 +23,7 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, './resources/js'), // Maps @ to your JS folder
+            '@': path.resolve(__dirname, './resources/js'),
         },
     },
 });

@@ -84,7 +84,6 @@ const formatTimeDisplay = (timeString: string | null): string => {
 </script>
 
 <template>
-
   <Head title="Attendance" />
   <AuthenticatedLayout>
     <template #header>
@@ -154,7 +153,8 @@ const formatTimeDisplay = (timeString: string | null): string => {
                 </span>
                 <div v-if="day.hasRecord"
                   :class="['mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase text-center border truncate', day.statusClass]">
-                  {{ day.status.replace('_', ' ') }}
+                  <!-- FIX: Handle null status safely -->
+                  {{ day.status ? day.status.replace('_', ' ') : '' }}
                 </div>
               </div>
             </div>
