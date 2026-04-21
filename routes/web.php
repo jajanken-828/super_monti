@@ -64,7 +64,7 @@ use App\Http\Controllers\logistics\TraineeController as LogisticsTraineeControll
 use App\Http\Controllers\man\ManAccessController;
 use App\Http\Controllers\man\Manager\ManufacturingManagerController;
 use App\Http\Controllers\man\ManDashboardController;
-use App\Http\Controllers\man\ManufacturingInventoryController; // <-- ADDED
+use App\Http\Controllers\man\ManufacturingInventoryController;
 use App\Http\Controllers\man\Staff\CheckerQualityController;
 use App\Http\Controllers\man\Staff\DyeingColorController;
 use App\Http\Controllers\man\Staff\DyeingFabricSoftenerController;
@@ -142,7 +142,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::delete('/profile', [ProfileController::class, '350'])->name('profile.destroy');
 });
 
 /*
@@ -433,6 +433,8 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
         Route::get('/', [ManufacturingManagerController::class, 'index'])->name('manager.dashboard');
         Route::get('/production', [ManufacturingManagerController::class, 'production'])->name('manager.production');
         Route::get('/rejected', [ManufacturingManagerController::class, 'rejected'])->name('manager.rejected');
+        Route::post('/rejected/{fabric}/recolor', [ManufacturingManagerController::class, 'recolorFabric'])->name('manager.rejected.recolor');
+        Route::post('/rejected/{fabric}/total-reject', [ManufacturingManagerController::class, 'rejectFabricTotally'])->name('manager.rejected.total-reject');
         Route::post('/orders/{id}/forward-to-checker', [ManufacturingManagerController::class, 'forwardToChecker'])->name('manager.forward-to-checker');
         Route::post('/staff/{id}/update-role', [ManufacturingManagerController::class, 'updateStaffRole'])->name('manager.update-staff-role');
         Route::post('/packages/{id}/send-to-logistics', [ManufacturingManagerController::class, 'sendToLogistics'])->name('manager.send-to-logistics');
@@ -558,6 +560,7 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
                 Route::post('/form/{id}/pack', 'packForm')->name('pack-form');
                 Route::post('/form/{id}/reject', 'rejectForm')->name('reject-form');
                 Route::post('/package/{id}/assign-to-order', 'assignPackageToOrder')->name('assign-package');
+                Route::post('/package/{id}/push-to-logistics', 'pushToLogistics')->name('push-to-logistics');
             });
     });
 });
