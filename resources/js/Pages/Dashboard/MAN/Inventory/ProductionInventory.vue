@@ -152,7 +152,7 @@ const usagePercent = (item) => {
                             <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Stock</th>
                             <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Container</th>
                             <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                            <!-- <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th> -->
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-zinc-800">
@@ -233,7 +233,7 @@ const usagePercent = (item) => {
                             </td>
 
                             <!-- Actions: consume units -->
-                            <td class="px-5 py-4">
+                            <!-- <td class="px-5 py-4">
                                 <div v-if="item.total_units && item.status !== 'depleted'" class="flex flex-col gap-1">
                                     <div class="flex items-center gap-1.5">
                                         <input
@@ -255,7 +255,7 @@ const usagePercent = (item) => {
                                 </div>
                                 <span v-else-if="item.status === 'depleted'" class="text-gray-400 text-xs italic">Depleted</span>
                                 <span v-else class="text-gray-300 text-xs">—</span>
-                            </td>
+                            </td> -->
                         </tr>
 
                         <!-- Empty state -->

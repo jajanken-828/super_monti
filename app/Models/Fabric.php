@@ -9,14 +9,10 @@ class Fabric extends Model
 {
     use HasFactory;
 
-    /**
-     * roll_no has been intentionally removed.
-     * The auto-generated `code` column (e.g. FABRIC-2026-00001) is the
-     * unique fabric identifier produced by ManufacturingStaffController::generateCode().
-     */
     protected $fillable = [
         'code',
         'manufacturing_order_id',
+        'sales_order_id',          // NEW — linked when knitting operator marks JO done
         'machine_id',
         'yarn_type',
         'weight',
@@ -47,5 +43,14 @@ class Fabric extends Model
     public function manufacturingOrder()
     {
         return $this->belongsTo(ManufacturingOrder::class);
+    }
+
+    /**
+     * The Sales Order / Job Order this fabric was produced for.
+     * Set by the knitting operator when marking a JO as knitting-done.
+     */
+    public function salesOrder()
+    {
+        return $this->belongsTo(SalesOrder::class);
     }
 }

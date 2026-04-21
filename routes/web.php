@@ -78,6 +78,7 @@ use App\Http\Controllers\ord\OrdAccessController;
 use App\Http\Controllers\ord\OrdDeliveryController;
 use App\Http\Controllers\ord\OrdOrdersController;
 use App\Http\Controllers\ord\OrdProductionsController;
+use App\Http\Controllers\pro\ProAccessController;
 use App\Http\Controllers\pro\ProcurementController;
 use App\Http\Controllers\pro\ProDashboardController;
 use App\Http\Controllers\ProfileController;
@@ -414,7 +415,7 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
     Route::middleware(['can.access.man.manager'])->group(function () {
         Route::get('/access/manage', [ManAccessController::class, 'index'])->name('access.manage');
         Route::post('/access/assign-supervisor', [ManAccessController::class, 'assignSupervisor'])->name('access.assign-supervisor');
-        
+
         // Manufacturing Inventory (Production Inventory)
         Route::get('/inventory', [ManufacturingInventoryController::class, 'index'])->name('inventory.index');
         Route::post('/inventory/{item}/container', [ManufacturingInventoryController::class, 'updateContainer'])->name('inventory.container.update');
@@ -469,6 +470,8 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified', 'm
                 Route::post('/fabric', 'storeFabric')->name('store-fabric');
                 Route::get('/reports', 'reports')->name('reports');
                 Route::post('/machine-report', 'reportMachine')->name('report-machine');
+                Route::post('mark-done/{id}', 'markDone')->name('mark-done');
+                Route::post('unmark-done/{id}', 'unmarkDone')->name('unmark-done');
             });
 
         Route::prefix('dyeing-color')->name('staff.dyeing-color.')->controller(DyeingColorController::class)
